@@ -1,0 +1,21 @@
+digraph G {
+	graph [layout=dot rankdir=DT]
+
+    subgraph cluster_distutils
+    {
+        label="distutils (standard)"
+
+        distutils
+        "setup.py"[shape=note]
+    }
+
+    subgraph cluster_setuptools
+    {
+        label="setuptools"
+        rank=same
+        setuptoools
+        pkg_resource
+        easy_install[shape=box]
+        "ez_setup.py"[shape=note]
+    }
+}

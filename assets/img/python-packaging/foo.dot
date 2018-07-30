@@ -1,0 +1,34 @@
+digraph G{
+ rankdir = LR;
+ node [shape = none]
+
+1->2->3->4[arrowhead=none]
+
+node [shape = ellipse]
+ACG[shape = none,label="",width=0, height=0];
+
+A->ACG[arrowhead=none];
+ACG->A2->A3;
+
+ subgraph clusterCG{
+  shape = rect;
+  rank=same;
+  A2;
+  B;
+  C;
+  color=blue;
+  label="C";
+ }
+
+ { rank=same; 1; A;}
+ { rank=same; 2; ACG;}
+ { rank=same; 4; A3;}
+
+}
+
+
+
+
+
+
+
