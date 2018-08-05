@@ -14,33 +14,94 @@ excerpted: |
 
 # 1 备份与恢复
 
-## 2.1 基于continuous archiving的备份
+PG支持三种类型的备份方式：
 
-### 2.1.1 配置WAL archiving
+1. SQL dump
+
+    - **描述**：SQL备份。使用`pg_dump`备份某个database（不包括cluster-level的对象，例如: role, tablespace），或者使用`pg_dumpall`备份整个cluster。
+
+    - **优点**
+    
+        1. 可以在线备份
+        2. 占用空间小
+
+    - **缺点**
+
+        1. 使用`pg_dumpall`备份整个cluster的时候，由于内部对每个database分别使用`pg_dump`，虽然保证了每个database内部状态是一致的，但是无法做到database之间（也即整个cluster）的状态是同步的。
+        2. 速度慢
+
+2. 文件系统级别的备份
+
+    - **描述**：物理备份。使用支持*consistent snapshot*的文件系统作为`PGDATA`目录的挂载介质，在需要备份的时候对该文件系统做一个`forzen snapshot`。之后在需要恢复备份的时候，将这个snapshot恢复，然后启动服务。由于snapshot保存了所有文件当时的状态，PG会认为刚经历过一次crash，因此会利用WAL进行恢复（这是正常行为）。
+
+    - **优点**
+
+        1. 可以在线备份
+        2. 速度快
+
+    - **缺点**
+
+        1. 占用空间大
+
+3. continuous archiving
+
+    - **描述**: `basebackup + WAL archive` 需要先创建一个basebackup（并非一致性的备份），然后利用归档的WAL进行replay，最终恢复一个一致的cluster。这里需要备份的是WAL archive.
+
+    - **优点**
+
+        1. 不需要创建一个一致性的备份用于恢复，因为那些不一致的地方可以通过后续的WAL追加可以达到一致
+        2. 可以通过持续备份WAL来做到持续备份整个数据库
+        3. 支持PIT(point-in-time)恢复，允许恢复到某个WAL对应的状态
+        4. 允许将WAL复制到另一台机器上，从而创建一个从库
+
+    - **缺点**
+        
+        1. 无法备份配置文件（因为它们不是通过SQL去修改的，而是手动修改的）
+        2. 需要对每一次WAL archive的失败进行快速的修复，否则如果服务器一旦毁坏，那么从失败点开始的数据都无法恢复
+
+以下重点介绍第三种备份的配置。
+
+## 1.1 基于continuous archiving的备份
+
+由于WAL默认每16MB（编译时确定）保存一份，以数字命名文件名，代表其在WAL sequence上的抽象位置点。_如果不设置`archive_mode`，那么PG仅仅会保留一部分感兴趣的WAL文件，那些位置点早于checkpoint的WAL文件则会被回收_(需要文献确认...)。而如果打开了`archive_mode`，那么每一份新产生的WAL文件都会被输入到`archive_command`中，由该命令来备份WAL。
+
+### 1.1.1 配置WAL archiving
 
 需要在*postgresql.conf*中做以下设置：
 
 1. `wal_level`为至少`replica`
 2. `archive_mode`为至少`on`
-3. `archive_command` (返回0代表成功归档一个WAL日志，可以运行时修改，需要reload配置)
+3. `archive_command` (返回0代表成功归档一个WAL日志，可以运行时修改，需要reload配置。当PG接收到0的返回值以后，它会认为该WAL文件已被正确的备份，因此会删除该WAL文件；否则它会重试)
 
-### 2.1.2 创建base backup
+### 1.1.2 创建base backup
 
 有两种方式可以创建base backup：
 
 1. 使用`pg_basebackup`工具
 2. 使用non-exclusive lowlevel API
 
-#### 2.1.2.1 pg_basebackup创建base backup
+#### 1.1.2.1 pg_basebackup创建base backup
 
-#### 2.1.2.2 non-exclusive lowlevel API创建base backup
+#### 1.1.2.2 non-exclusive lowlevel API创建base backup
 
-1. `SELECT pg_start_backup('label', false, false)`：执行checkpoint，这个过程I/O会被限制在一定的量（基于`checkpoint_completion_target`）
-2. 使用命令备份文件目录(cp, tar, rsync, etc.)
-3. `SELECT * FROM pg_stop_backup(false)`：退出备份模式，在master上，它还会自动切换下一个WAL segment;如果是在standby上做备份，需要在master上手动执行`pg_switch_xlog`，从而保证恢复需要的WAL log都被archive了。这个操作是为了保证备份过程中的最后一个WAL log被archive.
+1. 在目标机上使用superuser或者别的有EXECUTE权限的用户连接到源库执行：`SELECT pg_start_backup('label', false, false)`，这个连接必须一直保持直到备份结束(会执行一次checkpoint)。
+
+    `pg_start_backup()`: 第一个参数可以取一个唯一的名字代表这次备份的标识；第二个参数代表是否限定备份使用的I/O量以减少其对其他Query操作的影响(见`checkpoint_completion_target`)；第三个参数代表是否是`exclusive`，目前`exclusive`已经被弃用，所以总是false。
+
+2. 使用命令备份文件目录(cp, tar, rsync, etc.). 注意：以下源库上的文件不应该备份：
+
+    - _pg_replslot/*_
+    - _pg_xlog/*_
+    - *postmaster.pid*
+    - *postmaster.opts*
+
+3. 在与之前start相同的连接中执行：`SELECT * FROM pg_stop_backup(false)`，这会退出备份模式，在master上，它还会自动切换下一个WAL segment;如果是在standby上做备份，需要在master上手动执行`pg_switch_xlog`，从而保证恢复需要的WAL log都被archive了。这个操作是为了保证备份过程中的最后一个WAL log被archive.
+
+    `pg_stop_backup()`：的第一个返回值是恢复备份需要的最后一个WAL 位置（也即备份过程中生成的最后一个WAL）的文件名；第二个返回值需要写到一个名为`backup_label`的文件，位于目标库的PGDATA目录；第三个返回值如果非空的话要写入目标库的PGDATA目录下的名为`tablespace_map`的文件中。
+
 4. 至此，一个完整的备份已经完成。`pg_stop_backup`的第一个返回值即是恢复备份需要的最后一个WAL segment的名字。
 
-## 2.2 Point-in-time 恢复
+## 1.2 Point-in-time 恢复
 
 基本步骤如下：
 
@@ -48,17 +109,28 @@ excerpted: |
 2. （如果有足够的空间）将数据目录和表空间另存一份
 3. 删除数据目录和表空间
 4. 从base backup恢复数据目录和表空间（注意权限和所有权）。如果使用了表空间，则确保*pg_tblspc/*中的软链接被正确的恢复了
-5. 删除*pg_xlog/*目录中的内容
+5. 删除*pg_xlog/*目录中的内容（因为这里的WAL文件是在创建basebackup时刻的内容，备份开始以后的WAL都通过`archive_command`被归档了）
 6. > If you have unarchived WAL segment files that you saved in step 2, copy them into pg_xlog/. (It is best to copy them, not move them, so you still have the unmodified files if a problem occurs and you have to start over.)
-7. 在数据目录下创建一个*recovery.conf*文件，并且填写相关内容（例如:`restore_command`, `stopping_point`）。同时，修改*pg_hba.conf*以组织用户连接这个数据库
+7. 在数据目录下创建一个*recovery.conf*文件，并且填写相关内容（例如:`restore_command`, `stopping_point`）。同时，修改*pg_hba.conf*以阻止用户连接这个数据库
 8. 启动服务器。此时，服务器会进入恢复模式，并且会通过`restore_command`读取archived的WAL log并且应用它们。如果中途出现任何错误，可以重启服务，重启后它会继续恢复。直到全部的WAL日志被应用完毕，它会将*recovery.conf*重命名为*recovery.done*，并且开始正常的数据库操作。
 9. 检查数据库是否已经恢复，如果是，则修改*pg_hba.conf*恢复用户的访问权
 
-## 2.3 timeline
+如果仅仅需要的是从备份恢复(而非PIT恢复)，那么执行到第四步即可。
+
+
+## 1.3 timeline
 
 假设你在周四晚上5:15PM误删了一个库，但是当时并没有意识到，直到周日早上才发现。此时，你可能会拿出备份恢复到周四晚上5:14PM的状态。之后，你意识到实际上那个被误删的库其实并不重要，而从周四到周日的数据的丢失更严重。此时，如果你想再恢复到周日早上的状态，这是做不到的。这是因为数据库会将原本周四5:15PM以后的WAL日志修改成你之前恢复的那个点以后发生的事件。
 
 幸运的是，PG通过**timeline**的概念解决了这个问题。在PG中，每当一个恢复操作成功就会新产生一个timeline，这个timeline以ID的形式作为WAL日志文件名的一部分，仅记录该次恢复之后产生的WAL日志。同时，PG会创建*timeline history*文件，用于记录这个恢复是属于哪个timeline以及恢复到何时的。
+
+示意图：
+
+![timeline](/assets/img/postgresql/timeline.png)
+
+## 1.4 实践
+
+[基于Docker的PITR实践](https://github.com/magodo/docker_practice/tree/master/postgresql)
 
 # 2 基于Log-shipping的高可用
 
@@ -216,3 +288,52 @@ standby在*recovery.conf*的连接字串中加入`application_name=<standby_name
 ### 2.9.2 同步流式复制的过程
 
 standby在启动后首先会进入*catchup mode*，则这个模式下standby会追master的WAL。直到第一次完全追上master的WAL之后，standby会进入*streaming state*。如果standby停止服务，那么它又进入*catchup mode*。仅当standby处于*streaming mode*的情况下，它才是一个同步standby，也即master会在每一个WAL复制时等待standby的响应。
+
+# 3. 服务器设置
+
+## 3.1 WAL设置
+
+下表列出几个重要的WAL相关的参数：
+
+|---
+|参数|类型|默认值|启动后可更改|描述
+|-|-|-|-
+|`wal_level`|enum| minimal|no|- minimal: 记录的信息仅能从crash或者立即关机状态下恢复数据<br>- replica: 记录的信息可以用于WAL archive或者只读从库<br>- logical: 支持逻辑解码
+|`fsync`|bool|on|no|保证每一次更新动作都调用`wal_sync_method`中指定的方式写入磁盘<br>**注意**：设置为off可能会导致数据库内部数据不一致
+|`synchornous_commit`|enum|on|yes|返回成功前是否等待WAL写入磁盘<br>- off: 不会导致数据库内部数据不一致，但是可能导致客户端/从库与服务器端状态不同步<br>- on: 等待服务器以及其从库收到commit并且写入磁盘才返回<br>- remote_apply: 等待服务器以及其从库收到commit并且应用才返回（此时读操作可以看到变化）<br>- remote_write: 等待服务器以及其从库收到commit并且写入操作系统（写队列）才返回，但是并不保证写入到磁盘（这可以保证DB实例crash不会导致数据丢失；但是操作系统的crash会导致数据丢失）<br>- local: 仅等待服务器收到commit并且写入磁盘才返回
+|`wal_writer_delay`|integer|200ms|no|等多久之后将WAL写入到磁盘，在这个时间点之间的WAL仅写入操作系统的写队列，并没有写入磁盘
+|`wal_writer_flush_after`|integer|1MB|no|写了多少WAL之后将WAL写入到磁盘，在这个时间点之间的WAL仅写入操作系统的写队列，并没有写入磁盘
+|===
+
+# 99. 中间件
+
+## 99.1 pgPool2
+
+[传送们](http://www.pgpool.net/mediawiki/index.php/Main_Page)
+
+- session级别的连接池
+- 复制，自动failover/failback 
+- 负载均衡
+- 达到最大连接时，新连接被加入等候队列（而不是默认的返回错误）
+
+## 99.2 pgbouncer
+
+[传送们](https://pgbouncer.github.io/)
+
+支持不同级别的连接池，包括：
+
+- session pooling
+- transaction pooling
+- statement pooling
+
+## 99.3 HAProxy
+
+[传送们](http://www.haproxy.org/)
+
+通用的负载均衡组件，支持TCP/HTTP代理。同时，与keepalived高度集成，支持高可用。
+
+## 99.4 Repmgr
+
+[传送们](https://repmgr.org/)
+
+对官方提供的复制功能的增强，支持自动failover/switchover。
