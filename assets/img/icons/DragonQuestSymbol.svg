@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!-- Created with Inkscape (http://www.inkscape.org/) by Toomai Glittershine for SmashWiki -->
+
+<svg
+   xmlns:dc="http://purl.org/dc/elements/1.1/"
+   xmlns:cc="http://creativecommons.org/ns#"
+   xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+   xmlns:svg="http://www.w3.org/2000/svg"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+   id="svg2"
+   version="1.1"
+   height="256"
+   width="256"
+   viewBox="0 0 256 256"
+   sodipodi:docname="DragonQuestSymbol.svg"
+   inkscape:version="0.92.2 2405546, 2018-03-11"
+   inkscape:export-filename="/home/magodo/github/magodo.github.io/assets/img/icons/favicon.png"
+   inkscape:export-xdpi="96"
+   inkscape:export-ydpi="96">
+  <defs
+     id="defs5319" />
+  <sodipodi:namedview
+     pagecolor="#ffffff"
+     bordercolor="#666666"
+     borderopacity="1"
+     objecttolerance="10"
+     gridtolerance="10"
+     guidetolerance="10"
+     inkscape:pageopacity="0"
+     inkscape:pageshadow="2"
+     inkscape:window-width="1920"
+     inkscape:window-height="1025"
+     id="namedview5317"
+     showgrid="false"
+     inkscape:zoom="1.3037281"
+     inkscape:cx="168.08656"
+     inkscape:cy="96.546247"
+     inkscape:window-x="0"
+     inkscape:window-y="27"
+     inkscape:window-maximized="1"
+     inkscape:current-layer="svg2" />
+  <metadata
+     id="metadata7">
+    <rdf:RDF>
+      <cc:Work
+         rdf:about="">
+        <dc:format>image/svg+xml</dc:format>
+        <dc:type
+           rdf:resource="http://purl.org/dc/dcmitype/StillImage" />
+        <dc:title />
+      </cc:Work>
+    </rdf:RDF>
+  </metadata>
+  <path
+     id="mainsymbolpath"
+     style="opacity:0.5;fill:#0b59fb;fill-opacity:1;stroke:none;stroke-width:1.13454211"
+     d="m 132.33898,46.118374 c -14.62782,0 -12.45189,39.783124 -24.78265,50.203488 -17.309597,14.627828 -75.83705,31.700218 -75.83705,79.240668 0,28.03667 11.63374,53.89075 100.6197,53.89075 88.98596,0 100.61971,-25.85408 100.61971,-53.89075 0,-47.54045 -58.52746,-64.61284 -75.83705,-79.240668 C 144.79088,85.901498 146.9668,46.118374 132.33898,46.118374 Z m -25.03083,95.797896 c 9.29054,0 16.84086,7.55033 16.84086,16.84086 0,9.29054 -7.55032,16.8054 -16.84086,16.8054 -9.29054,0 -16.805407,-7.51486 -16.805407,-16.8054 0,-9.29053 7.514867,-16.84086 16.805407,-16.84086 z m 50.06167,0 c 9.29054,0 16.8054,7.55033 16.8054,16.84086 0,9.29054 -7.51486,16.8054 -16.8054,16.8054 -9.29054,0 -16.84086,-7.51486 -16.84086,-16.8054 0,-9.29053 7.55032,-16.84086 16.84086,-16.84086 z m -50.06167,9.74997 c -3.90472,0 -7.05544,3.18616 -7.05544,7.09089 0,3.90472 3.15072,7.05543 7.05544,7.05543 3.90472,0 7.05543,-3.15071 7.05543,-7.05543 0,-3.90473 -3.15071,-7.09089 -7.05543,-7.09089 z m 50.06167,0 c -3.90472,0 -7.05544,3.18616 -7.05544,7.09089 0,3.90472 3.15072,7.05543 7.05544,7.05543 3.90472,0 7.05543,-3.15071 7.05543,-7.05543 0,-3.90473 -3.15071,-7.09089 -7.05543,-7.09089 z m 15.24541,28.39901 a 5.6732778,5.6732778 0 0 1 4.07726,9.53724 c 0,0 -3.75437,4.04135 -10.91997,7.51634 -7.1656,3.47498 -18.11722,6.80726 -33.43354,6.80726 -15.31632,0 -26.26794,-3.33228 -33.43353,-6.80726 -7.165601,-3.47499 -10.919972,-7.51634 -10.919972,-7.51634 a 5.6738184,5.6738184 0 1 1 8.438152,-7.58725 c 0,0 1.79159,2.15087 7.44544,4.89271 5.65384,2.74185 14.77437,5.67272 28.46991,5.67272 13.69555,0 22.81608,-2.93087 28.46992,-5.67272 5.65384,-2.74184 7.44543,-4.89271 7.44543,-4.89271 a 5.6732778,5.6732778 0 0 1 4.3609,-1.94999 z"
+     inkscape:connector-curvature="0" />
+</svg>

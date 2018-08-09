@@ -188,9 +188,11 @@ PG支持三种类型的备份方式：
 
 1. 创建一个供standby用来复制的role
 1. *pg_hba.conf*中为standby的这个role创建db为`replication`的访问项
+1. *postgresql.conf*中设置`wal_level`为至少`replica`
 1. *postgresql.conf*中设置`max_wal_senders`为适当值
 1. *postgresql.conf*中设置`listen_address`
 1. *postgresql.conf*中设置`max_replication_slots`为适当值
+1. *postgresql.conf*中设置`full_page_writes`为`on`（默认即为`on`），这是运行`pg_basebackup`的前提条件
 1. （如果流是基于TPC的），在 *postgresql.conf* 中设置`tcp_keepalives_idle`, `tcp_keepalives_internal`, `tcp_keepalives_count`
 1. 为standby创建一个复制槽
 
@@ -200,7 +202,25 @@ PG支持三种类型的备份方式：
 
 ## 2.4 配置standby
 
-1. 先在standby机器上从basebackup恢复。然后，新建一个*recovery.conf*文件（如果使用**pg_basebackup**恢复的话，加入`-R`参数可以自动创建该文件），在文件中做如下配置：
+1. 先在standby机器上从basebackup恢复
+
+    可以使用`pg_basebackup`的如下命令：
+
+        # rm -rf $PGDATA
+        # pg_basebackup -D $PGDATA -F p -R -S [slotname] -X stream [-c fast] -d [connstr]
+
+    其中`connstr`的说明可以参见[官网](https://www.postgresql.org/docs/9.6/static/libpq-connect.html#LIBPQ-CONNSTRING)，一个简单的例子如下：
+
+        postgresql://user:password@host:port[/dbname]?application_name=foobar
+
+    `connstr`相对于在命令行上以`-h`,`-U`等来指定连接参数的好处：
+
+    - 它可以指定密码，否则的话你需要准备一个*~/.pgpass*文件来存放密码
+    - 它允许加入额外的连接参数（例如：`application_name`），而这些额外的连接参数会被加入到创建出来的*recovery.conf*文件中
+
+        
+
+2. 新建一个*recovery.conf*文件（如果使用**pg_basebackup**恢复的话，加入`-R`参数可以自动创建该文件），在文件中做如下配置：
 
     1. 设置`standby_mode`为`on`
     2. （如果使用基于文件的log-shipping） 设置`restore_command`去拷贝WAL archive 
@@ -208,7 +228,7 @@ PG支持三种类型的备份方式：
     4. （如果使用基于流的log-shipping）设置`primary_conninfo`，其内容称为**libpq connection string**，包括host name(or IP)和其他额外的选项（例如：密码）示例：`user=postgres host=170.17.0.1 port=32810 sslmode=prefer sslcompression=1 krbsrvname=postgres`
     5. （如果使用基于流的log-shipping）设置`primary_slot_name`
 
-2. 由于这个standby在容灾后会成为primary，因此需要像之前的primary一样做基于文件或者基于流的log-shipping的配置
+3. 由于这个standby在容灾后会成为primary，因此需要像之前的primary一样做基于文件或者基于流的log-shipping的配置
 
 ## 2.5 流式复制(streaming replication)
 

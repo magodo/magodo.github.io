@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!-- Created with Inkscape (http://www.inkscape.org/) by Toomai Glittershine for SmashWiki -->
+
+<svg
+   xmlns:dc="http://purl.org/dc/elements/1.1/"
+   xmlns:cc="http://creativecommons.org/ns#"
+   xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+   xmlns:svg="http://www.w3.org/2000/svg"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+   id="svg2"
+   version="1.1"
+   height="256"
+   width="256"
+   viewBox="0 0 256 256"
+   sodipodi:docname="DragonQuestSymbol.svg"
+   inkscape:version="0.92.2 2405546, 2018-03-11"
+   inkscape:export-filename="/home/magodo/github/magodo.github.io/assets/img/icons/DragonQuestSymbol.png"
+   inkscape:export-xdpi="96"
+   inkscape:export-ydpi="96">
+  <defs
+     id="defs890" />
+  <sodipodi:namedview
+     pagecolor="#ffffff"
+     bordercolor="#666666"
+     borderopacity="1"
+     objecttolerance="10"
+     gridtolerance="10"
+     guidetolerance="10"
+     inkscape:pageopacity="0"
+     inkscape:pageshadow="2"
+     inkscape:window-width="1920"
+     inkscape:window-height="1025"
+     id="namedview888"
+     showgrid="false"
+     inkscape:zoom="1.3037281"
+     inkscape:cx="-25.443339"
+     inkscape:cy="78.034199"
+     inkscape:window-x="0"
+     inkscape:window-y="27"
+     inkscape:window-maximized="1"
+     inkscape:current-layer="svg2" />
+  <metadata
+     id="metadata7">
+    <rdf:RDF>
+      <cc:Work
+         rdf:about="">
+        <dc:format>image/svg+xml</dc:format>
+        <dc:type
+           rdf:resource="http://purl.org/dc/dcmitype/StillImage" />
+        <dc:title />
+      </cc:Work>
+    </rdf:RDF>
+  </metadata>
+  <path
+     style="opacity:0.47099998;fill:#000022;fill-opacity:1;stroke:none;stroke-width:8.75457859;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1"
+     d="M 46.4375 28.191406 C 41.107503 28.191406 36.818359 28.750498 36.818359 29.443359 L 36.818359 210.26172 C 36.818359 210.95458 41.107503 211.51172 46.4375 211.51172 L 210.51758 211.51172 C 215.84757 211.51172 220.13867 210.95458 220.13867 210.26172 L 220.13867 29.443359 C 220.13867 28.750498 215.84757 28.191406 210.51758 28.191406 L 46.4375 28.191406 z M 128 47.203125 C 140.89315 47.203125 138.97526 82.268482 149.84375 91.453125 C 165.10065 104.34628 216.6875 119.3941 216.6875 161.29688 C 216.6875 186.00875 206.43337 208.79688 128 208.79688 C 49.566628 208.79688 39.3125 186.00876 39.3125 161.29688 C 39.3125 119.3941 90.899349 104.34628 106.15625 91.453125 C 117.02474 82.268482 115.10685 47.203125 128 47.203125 z M 105.9375 131.64062 C 97.748702 131.64062 91.125 138.29558 91.125 146.48438 C 91.125 154.67317 97.748702 161.29688 105.9375 161.29688 C 114.1263 161.29688 120.78125 154.67318 120.78125 146.48438 C 120.78125 138.29558 114.1263 131.64062 105.9375 131.64062 z M 150.0625 131.64062 C 141.8737 131.64062 135.21875 138.29558 135.21875 146.48438 C 135.21875 154.67317 141.8737 161.29688 150.0625 161.29688 C 158.2513 161.29688 164.875 154.67318 164.875 146.48438 C 164.875 138.29558 158.2513 131.64062 150.0625 131.64062 z M 105.9375 140.23438 C 109.37917 140.23438 112.15625 143.0427 112.15625 146.48438 C 112.15625 149.92604 109.37917 152.70312 105.9375 152.70312 C 102.49583 152.70312 99.71875 149.92604 99.71875 146.48438 C 99.71875 143.0427 102.49583 140.23438 105.9375 140.23438 z M 150.0625 140.23438 C 153.50417 140.23438 156.28125 143.0427 156.28125 146.48438 C 156.28125 149.92604 153.50417 152.70312 150.0625 152.70312 C 146.62083 152.70312 143.84375 149.92604 143.84375 146.48438 C 143.84375 143.0427 146.62083 140.23438 150.0625 140.23438 z M 163.5 165.26562 A 5.0005 5.0005 0 0 0 159.65625 166.98438 C 159.65625 166.98438 158.07712 168.88018 153.09375 171.29688 C 148.11038 173.71357 140.07143 176.29688 128 176.29688 C 115.92857 176.29688 107.88962 173.71357 102.90625 171.29688 C 97.922879 168.88018 96.34375 166.98438 96.34375 166.98438 A 5.0009765 5.0009765 0 1 0 88.90625 173.67188 C 88.90625 173.67188 92.215401 177.23397 98.53125 180.29688 C 104.8471 183.35977 114.5 186.29688 128 186.29688 C 141.5 186.29688 151.1529 183.35977 157.46875 180.29688 C 163.7846 177.23397 167.09375 173.67188 167.09375 173.67188 A 5.0005 5.0005 0 0 0 163.5 165.26562 z "
+     id="rect5215" />
+</svg>
