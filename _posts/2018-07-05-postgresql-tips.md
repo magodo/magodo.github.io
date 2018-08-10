@@ -170,7 +170,7 @@ PG支持三种类型的备份方式：
 
 ![standby server](/assets/img/postgresql/standby.png)
 
-如上图所示，一个DB实例有一个模式叫做**Standby Mode**，在这个模式下它会不断地去读WAL，然后应用到自身。
+如上图所示，一个DB实例有一个模式叫做**Standby Mode**/**Recovery Mode**(细分为**catchup mode** + **streaming mode**)，在这个模式下它会不断地去读WAL，然后应用到自身。
 
 而退出这个模式的条件有三个：
 
@@ -193,6 +193,8 @@ PG支持三种类型的备份方式：
 1. *postgresql.conf*中设置`listen_address`
 1. *postgresql.conf*中设置`max_replication_slots`为适当值
 1. *postgresql.conf*中设置`full_page_writes`为`on`（默认即为`on`），这是运行`pg_basebackup`的前提条件
+1. *postgresql.conf*中设置`wal_log_hints`为`on`（默认为`off`）；或者，在初始化的时候(`initdb`)加入`--data-checksums`选项。这是运行`pg_rewind`的前提条件
+1. *postgresql.conf*中设置`wal_keep_segments`为一个非零值（默认为0），这用于standby的复制和`pg_rewind`比较WAL的过程（虽然standby的复制可以通过slot来保证WAL不会由于过期被删除）。
 1. （如果流是基于TPC的），在 *postgresql.conf* 中设置`tcp_keepalives_idle`, `tcp_keepalives_internal`, `tcp_keepalives_count`
 1. 为standby创建一个复制槽
 
@@ -381,7 +383,58 @@ standby在启动后首先会进入**catchup mode**，则这个模式下standby�
 
 > If archive_mode is set to on, the archiver is not enabled during recovery or standby mode. If the standby server is promoted, it will start archiving after the promotion, but will not archive any WAL it did not generate itself. To get a complete series of WAL files in the archive, you must ensure that all WAL is archived, before it reaches the standby. This is inherently true with file-based log shipping, as the standby can only restore files that are found in the archive, but not if streaming replication is enabled. When a server is not in recovery mode, there is no difference between on and always modes.
 
- 3. 服务器设置
+### 2.10 Failover
+
+**failover**指当前的primary由于某种原因（宕机/网络拥堵/系统阻塞等）而被认为无法提供服务，将standby提升为primary的继续为外部提供服务的过程。
+
+**failover**一般有以下几个过程：
+
+1. 保证standby处于**streaming mode**（而不是**catchup mode**）才可以继续failover
+1. 通过某种机制保证primary在下次恢复之后会触发failback以防止脑裂
+1. 将运行中的standby通过创建*trigger_file*（由*recovery.conf*指定）或者使用`pg_ctl promote`来使其退出**streaming mode**，进入正常模式，对外提供服务
+1. 在这个新的primary上创建replication slot（详情见本小节尾部的注意事项）
+1. 将对外提供服务的网络从primary解绑，绑定到standby上
+
+值得注意的是：
+
+- 主从复制会复制数据和用户，但是不会复制创建的replication slot。一个直观的想法是在配置主从的时候在两个cluster都创建replication slot，但是问题是我们无法在启动standby以后在standby上执行任何sql命令。
+
+    所以，我们需要在每次failover的时候在新的primary上创建replication slot
+
+- 如上所述，我们会在promote以后向pg发送命令，那么我们需要一种机制确保promote已经确实完成了。然而，实际上promote做的事情只是往`PGDATA`目录中创建一个文件，告诉PG可以退出**recovery mode**。但实际上，PG还会做一些别的事情（例如：创建新的timeline）。所以，`pg_ctl promote`的结束不代表整个过程结束。在PG-v10版本以后，`pg_ctl promote`加入了`-w`选项，保证了这一点（[详见](https://paquier.xyz/postgresql-2/postgres-10-wait-pgctl-promote/)）。而在那之前，我们需要自己去判断这一点（例如可以通过发送dummy SQL给PG）
+
+### 2.11 Failback
+
+**failback**指primary在恢复服务之后将自己降级为standby的过程。
+
+**failback**一般有以下几个过程：
+
+1. 停止target cluster
+1. 在target cluster上执行`pg_rewind`
+1. 在target cluster上创建*recovery.conf*
+1. 启动target cluster
+
+`pg_rewind`的工作原理如下：
+
+1. 它会扫描target cluster（即，待rewind的cluster）的WAL，从source cluster的timeline历史分叉的点之前的第一个checkpoint开始。对于这段区间内每一个WAL，会记录响应的data block
+2. 将上面记录的data block从source cluster拷贝过来，可以从运行时的source cluster拷贝(`--source-server`)，也可以从停止了的source cluster拷贝（`--source-pgdata`）
+3. 将其余的文件（除了relation文件外，例如`pg_clog`/配置文件等）从source cluster拷贝过来
+4. 在target cluster的data目录下创建一个backup_label文件，指向搜索开始的checkpoint，用于当target cluster启动后应用WAL日志
+
+其中有以下几点需要注意：
+
+1. 如果使用`--source-server`从运行时的source cluster拷贝，则连接参数中的db用户一定要有SUPER权限
+1. 由于要拷贝relation文件外的其他文件，因此要保证这些文件在target cluster上都有访问权限
+1. 执行`pg_rewind`的时候，target cluster是停止状态
+1. source/target cluster *postgresql.conf*中设置`wal_log_hints`为`on`（默认为`off`）；或者，在初始化的时候(`initdb`)加入`--data-checksums`选项。这是运行`pg_rewind`的前提条件
+1. source/target cluster *postgresql.conf*中设置`wal_keep_segments`为一个非零值（默认为0），这是为了防止当在target cluster上执行`pg_rewind`后它去source cluster比较WAL的时候source cluster中已经将某些WAL删除了
+1. `pg_rewind`结束后，如果直接启动target cluster，它会进入**primary mode**。如果想要让target cluster继续follow source cluster，我们需要在target cluster的*PGDATA*目录下添加一个*recovery.conf*文件
+
+### 2.12 实践
+
+[基于Docker的HA实践](https://github.com/magodo/docker_practice/tree/master/postgresql)
+
+# 3. 服务器设置
 
 ## 3.1 WAL设置
 
