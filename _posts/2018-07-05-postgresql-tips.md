@@ -71,7 +71,7 @@ PG支持三种类型的备份方式：
 
 1. `wal_level`为至少`replica`
 2. `archive_mode`为至少`on`
-3. `archive_command` (返回0代表成功归档一个WAL日志，可以运行时修改，需要reload配置。当PG接收到0的返回值以后，它会认为该WAL文件已被正确的备份，因此会删除该WAL文件；否则它会重试)
+3. `archive_command` (返回0代表成功归档一个WAL日志，可以运行时修改，需要reload配置。当PG接收到0的返回值以后，它会认为该WAL文件已被正确的备份；否则它会重试)
 
 ### 1.1.2 创建base backup
 
@@ -187,15 +187,21 @@ PG支持三种类型的备份方式：
 ### 2.3.2 基于流的log-shipping
 
 1. 创建一个供standby用来复制的role
-1. *pg_hba.conf*中为standby的这个role创建db为`replication`的访问项
-1. *postgresql.conf*中设置`wal_level`为至少`replica`
-1. *postgresql.conf*中设置`max_wal_senders`为适当值
-1. *postgresql.conf*中设置`listen_address`
-1. *postgresql.conf*中设置`max_replication_slots`为适当值
-1. *postgresql.conf*中设置`full_page_writes`为`on`（默认即为`on`），这是运行`pg_basebackup`的前提条件
-1. *postgresql.conf*中设置`wal_log_hints`为`on`（默认为`off`）；或者，在初始化的时候(`initdb`)加入`--data-checksums`选项。这是运行`pg_rewind`的前提条件
-1. *postgresql.conf*中设置`wal_keep_segments`为一个非零值（默认为0），这用于standby的复制和`pg_rewind`比较WAL的过程（虽然standby的复制可以通过slot来保证WAL不会由于过期被删除）。
-1. （如果流是基于TPC的），在 *postgresql.conf* 中设置`tcp_keepalives_idle`, `tcp_keepalives_internal`, `tcp_keepalives_count`
+1. *pg_hba.conf*
+    
+    1. 为standby的这个role创建db为`replication`的访问项
+
+1. *postgresql.conf*:
+
+    1. 设置`wal_level`为至少`replica`
+    1. 设置`max_wal_senders`为适当值
+    1. 设置`listen_address`
+    1. 设置`max_replication_slots`为适当值
+    1. 设置`full_page_writes`为`on`（默认即为`on`），这是运行`pg_basebackup`的前提条件
+    1. 设置`wal_log_hints`为`on`（默认为`off`）；或者，在初始化的时候(`initdb`)加入`--data-checksums`选项。这是运行`pg_rewind`的前提条件
+    1. 设置`wal_keep_segments`为一个非零值（默认为0），这用于standby的复制和`pg_rewind`比较WAL的过程（虽然standby的复制可以通过slot来保证WAL不会由于过期被删除）。
+    1. （如果流是基于TPC的）设置`tcp_keepalives_idle`, `tcp_keepalives_internal`, `tcp_keepalives_count`
+
 1. 为standby创建一个复制槽
 
 ### 2.3.3 基于以上两者
@@ -230,7 +236,7 @@ PG支持三种类型的备份方式：
     4. （如果使用基于流的log-shipping）设置`primary_conninfo`，其内容称为**libpq connection string**，包括host name(or IP)和其他额外的选项（例如：密码）示例：`user=postgres host=170.17.0.1 port=32810 sslmode=prefer sslcompression=1 krbsrvname=postgres`
     5. （如果使用基于流的log-shipping）设置`primary_slot_name`
 
-3. 由于这个standby在容灾后会成为primary，因此需要像之前的primary一样做基于文件或者基于流的log-shipping的配置
+3. 由于这个standby在容灾后会成为primary，因此需要像之前的primary一样做基于文件或者基于流的log-shipping的配置。不过这些配在做basebackup的时候都已经被同步到standby了，所以没有额外的需要做的。当容灾后，记得在新的pirmary上重新创建replication slot.
 
 ## 2.5 流式复制(streaming replication)
 
@@ -368,6 +374,8 @@ PG支持三种类型的备份方式：
 ### 2.8.3 高可用
 
 高可用的最好的解决方案是同步复制+多个从库（总是保证有potential standby），这样可以保证主库不会由于一个同步从库的宕机而被阻塞。
+
+不过，另外一种可能的方案是同步复制+一个从库，然后使用一个第三方哨兵节点来检测从库状态。当发现从库服务不正常的时候，在primary上面动态修改*postgresql.conf*中的`synchronous_standby_names`为空，然后执行`pg_ctl reload`，即退化为异步复制（这个操作会使被hang住的客户端程序恢复）；后续当这个从库恢复服务之后并被哨兵节点感应到，哨兵节点再动态地设置为同步。
 
 standby在启动后首先会进入**catchup mode**，则这个模式下standby会追primary的WAL。直到第一次完全追上primary的WAL之后，standby会进入**streaming state**。如果standby停止服务，那么它又进入**catchup mode**。仅当standby处于**streaming mode**的情况下，它才是一个同步standby，也即primary会在每一个WAL复制时等待standby的响应。
 
