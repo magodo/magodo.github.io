@@ -232,7 +232,7 @@ PG支持三种类型的备份方式：
 
     1. 设置`standby_mode`为`on`
     2. （如果使用基于文件的log-shipping） 设置`restore_command`去拷贝WAL archive 
-    3. （如果你要设置多个standby）设置`recovery_target_timeline`为`latest`, to make the standby server follow the timeline change that occurs at failover to another standby.
+    3. （如果你要设置多个standby）设置`recovery_target_timeline`为`latest`, to make the standby server follow the timeline change that occurs at failover to another standby. 例如，对于一个priamry+standby的高可用架构，如果创建一个standby指向高可用的VIP，那么这个新创建的standby需要设置`recovery_target_timeline`为`latest`，从而确保当高可用发生容灾之后（standby promote，timeline+1）依然可以用新timeline的wal日志
     4. （如果使用基于流的log-shipping）设置`primary_conninfo`，其内容称为**libpq connection string**，包括host name(or IP)和其他额外的选项（例如：密码）示例：`user=postgres host=170.17.0.1 port=32810 sslmode=prefer sslcompression=1 krbsrvname=postgres`
     5. （如果使用基于流的log-shipping）设置`primary_slot_name`
 
