@@ -111,7 +111,10 @@ PG支持三种类型的备份方式：
 4. 从base backup恢复数据目录和表空间（注意权限和所有权）。如果使用了表空间，则确保*pg_tblspc/*中的软链接被正确的恢复了
 5. 删除*pg_xlog/*目录中的内容（因为这里的WAL文件是在创建basebackup时刻的内容，备份开始以后的WAL都通过`archive_command`被归档了）
 6. > If you have unarchived WAL segment files that you saved in step 2, copy them into pg_xlog/. (It is best to copy them, not move them, so you still have the unmodified files if a problem occurs and you have to start over.)
-7. 在数据目录下创建一个*recovery.conf*文件，并且填写相关内容（例如:`restore_command`, `stopping_point`）。同时，修改*pg_hba.conf*以阻止用户连接这个数据库
+7. 在数据目录下创建一个*recovery.conf*文件，并且填写相关内容（例如:`restore_command`, `stopping_point`）。同时，修改*pg_hba.conf*以阻止用户连接这个数据库。
+
+    特别地，如果你在*recovery.conf*中通过`recovery_target_time`或者`recovery_target_name`指定恢复点，那么你应该总是指定相应的`recovery_target_timeline`!!! 对于`recovery_target_name`，可以在创建的时候将创建的时候的当时的timeline记录下来；对于`recovery_target_time`，可以在`archive_command`中对目标archive文件名前面加一个timestamp前缀，要恢复的时候，根据传入的时间找到对应时间戳的archive文件，同时也就确定了它的timeline，然后就可以根据timeline和传入的时间进行恢复。
+
 8. 启动服务器。此时，服务器会进入恢复模式，并且会通过`restore_command`读取archived的WAL log并且应用它们。如果中途出现任何错误，可以重启服务，重启后它会继续恢复。直到全部的WAL日志被应用完毕，它会将*recovery.conf*重命名为*recovery.done*，并且开始正常的数据库操作。
 9. 检查数据库是否已经恢复，如果是，则修改*pg_hba.conf*恢复用户的访问权
 
@@ -442,6 +445,44 @@ standby在启动后首先会进入**catchup mode**，则这个模式下standby�
 
 [基于Docker的HA实践](https://github.com/magodo/docker_practice/tree/master/postgresql)
 
+### 2.13 高可用PITR的几个tips
+
+#### 高可用恢复过程
+
+1. 创建一个新的高可用实例，然后做PITR恢复:
+
+    首先，创建一个primary实例，然后PITR恢复到指定的target。再以这个primary实例创建它的standby。
+
+    这么做的好处在于，原有高可用实例可以维持服务。在验证恢复成功后，再将开放连接。
+
+2. PITR恢复已有的高可用实例：
+
+    停止DB，对当前的priamry与basebackup做同步（rsync），然后PITR恢复到指定的target。在primary恢复以后，再将standby的PGDATA清空，重新根据primary做basebackup，然后启动standby。
+
+### 高可用归档策略
+
+1. 归档至独立存储
+
+    这个比较简单和直接，设置`archive_mode = on`，这样就只有primary会在每次switch wal的时候归档，standby只接收wal，而不会归档。
+
+2. 归档至实例所在的存储
+
+    - 为了保证主从都有archive，需要将`archive_mode = always`，这样从库接收到主库的wal之后也会archive
+
+    - (如果archive存在PGDATA目录下) PITR恢复主库的时候需要忽略archive目录，例如通过`rsync`将主库的PGDATA与basebackup目录进行同步的时候，应该--exclude archive目录，否则archive目录会被同步为basebackup时候的状态
+
+    - 为了保证主从的archive都是完整的，在PITR恢复完主库之后，创建从库的时候使用的`pg_basebackup`命令应该不传输wal，也即：不添加`-X`参数（10.4以后，可以设置`-X none`）。否则，pg_basebackup会将basebackup过程中产生的wal（至少一个，可能更多）直接拷贝至target目录（也即从库的PGDATA/pg_xlog），在从库起来以后对于pg_xlog下已经存在的wal，它不会再进行archive，也就是说这些wal在从库的archive目录下就丢失了
+
+### 容灾发生前后归档的状态
+
+*以下仅适用pg-9.5+*
+
+假设有A和B两个单点DB，组成了一个高可用架构，A为初始的主库，B为初始的从库。
+
+假设当前的WAL名为WAL1-1，然后发生了容灾，当B promote为主库的时候，在B上的WAL1-1还不是完整的，但是B又需要将timeline加一，并且生成新的WAL（称之为WAL2-1），那么B会将这个不完整的WAL1-1重命名为WAL1-1.partial（内容是一样的），然后对其进行archive。同时，从WAL1-1.partial拷贝出一个新的文件WAL2-1，并会作为当前的WAL继续接收新的LSN。
+
+具体的关于parital的特性可以参考[这篇](https://paquier.xyz/postgresql-2/postgres-9-5-feature-highlight-partial-segment-timeline/)文章。
+
 # 3. 服务器设置
 
 ## 3.1 WAL设置
@@ -490,3 +531,9 @@ standby在启动后首先会进入**catchup mode**，则这个模式下standby�
 [传送们](https://repmgr.org/)
 
 对官方提供的复制功能的增强，支持自动failover/switchover。
+
+# 100. 参考资料
+
+1. [Michael Paquier - PostgreSQL hacker](https://paquier.xyz/)
+2. [官网](https://www.postgresql.org/docs/9.6/static/index.html)
+3. [The Internals of PostgreSQL](http://www.interdb.jp/pg/)
