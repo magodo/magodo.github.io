@@ -113,7 +113,7 @@ PG支持三种类型的备份方式：
 6. > If you have unarchived WAL segment files that you saved in step 2, copy them into pg_xlog/. (It is best to copy them, not move them, so you still have the unmodified files if a problem occurs and you have to start over.)
 7. 在数据目录下创建一个*recovery.conf*文件，并且填写相关内容（例如:`restore_command`, `stopping_point`）。同时，修改*pg_hba.conf*以阻止用户连接这个数据库。
 
-    特别地，如果你在*recovery.conf*中通过`recovery_target_time`或者`recovery_target_name`指定恢复点，那么你应该总是指定相应的`recovery_target_timeline`!!! 对于`recovery_target_name`，可以在创建的时候将创建的时候的当时的timeline记录下来；对于`recovery_target_time`，可以在`archive_command`中对目标archive文件名前面加一个timestamp前缀，要恢复的时候，根据传入的时间找到对应时间戳的archive文件，同时也就确定了它的timeline，然后就可以根据timeline和传入的时间进行恢复。
+    特别地，如果你在*recovery.conf*中通过`recovery_target_time`或者`recovery_target_name`指定恢复点并且做了**多次**恢复，那么你应该总是指定相应的`recovery_target_timeline`!!! 对于`recovery_target_name`，可以在创建的时候将创建的时候的当时的timeline记录下来；对于`recovery_target_time`，可以在`archive_command`中对目标archive文件的文件名和当时的时间戳建立一个映射关系；要恢复的时候，根据传入的时间找到对应时间戳的archive文件名，同时也就确定了它的timeline，然后就可以根据timeline和传入的时间进行恢复。
 
 8. 启动服务器。此时，服务器会进入恢复模式，并且会通过`restore_command`读取archived的WAL log并且应用它们。如果中途出现任何错误，可以重启服务，重启后它会继续恢复。直到全部的WAL日志被应用完毕，它会将*recovery.conf*重命名为*recovery.done*，并且开始正常的数据库操作。
 9. 检查数据库是否已经恢复，如果是，则修改*pg_hba.conf*恢复用户的访问权
