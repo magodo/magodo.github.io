@@ -101,6 +101,15 @@ PG支持三种类型的备份方式：
 
 4. 至此，一个完整的备份已经完成。`pg_stop_backup`的第一个返回值即是恢复备份需要的最后一个WAL segment的名字。
 
+#### 1.1.2.3 注意事项
+
+1. 从PG9.2开始，支持在hot standby上面创建basebackup，但是这个过程和在primary上创建有以下几个区别：
+
+    - 不会产生backup history文件(i.e. xxx.backup)
+    - 不会在开始和结束的时候switch xlog （这也是合理的，否则priamry和standby的xlog不同步了）
+
+    更多讨论可以参见：[这个mail](https://www.postgresql.org/message-id/6ac35bd51a0a4faad011fab162a2888a09ab2dd7.camel%40sina.com)
+
 ## 1.2 Point-in-time 恢复
 
 基本步骤如下：
@@ -113,7 +122,11 @@ PG支持三种类型的备份方式：
 6. > If you have unarchived WAL segment files that you saved in step 2, copy them into pg_xlog/. (It is best to copy them, not move them, so you still have the unmodified files if a problem occurs and you have to start over.)
 7. 在数据目录下创建一个*recovery.conf*文件，并且填写相关内容（例如:`restore_command`, `stopping_point`）。同时，修改*pg_hba.conf*以阻止用户连接这个数据库。
 
-    特别地，如果你在*recovery.conf*中通过`recovery_target_time`或者`recovery_target_name`指定恢复点并且做了**多次**恢复，那么你应该总是指定相应的`recovery_target_timeline`!!! 对于`recovery_target_name`，可以在创建的时候将创建的时候的当时的timeline记录下来；对于`recovery_target_time`，可以在`archive_command`中对目标archive文件的文件名和当时的时间戳建立一个映射关系；要恢复的时候，根据传入的时间找到对应时间戳的archive文件名，同时也就确定了它的timeline，然后就可以根据timeline和传入的时间进行恢复。
+    特别地，如果你在*recovery.conf*中通过`recovery_target_time`或者`recovery_target_name`指定恢复点并且做了**多次**恢复，那么你应该总是指定相应的`recovery_target_timeline`!!! 
+
+    对于`recovery_target_name`，可以在创建的时候将创建的时候的当时的timeline记录下来.
+    
+    对于`recovery_target_timeline`，可以参考2.13.5节的方法。
 
 8. 启动服务器。此时，服务器会进入恢复模式，并且会通过`restore_command`读取archived的WAL log并且应用它们。如果中途出现任何错误，可以重启服务，重启后它会继续恢复。直到全部的WAL日志被应用完毕，它会将*recovery.conf*重命名为*recovery.done*，并且开始正常的数据库操作。
 9. 检查数据库是否已经恢复，如果是，则修改*pg_hba.conf*恢复用户的访问权
@@ -447,7 +460,7 @@ standby在启动后首先会进入**catchup mode**，则这个模式下standby�
 
 ### 2.13 高可用PITR的几个tips
 
-#### 高可用恢复过程
+#### 2.13.1 高可用恢复过程
 
 1. 创建一个新的高可用实例，然后做PITR恢复:
 
@@ -459,7 +472,7 @@ standby在启动后首先会进入**catchup mode**，则这个模式下standby�
 
     停止DB，对当前的priamry与basebackup做同步（rsync），然后PITR恢复到指定的target。在primary恢复以后，再将standby的PGDATA清空，重新根据primary做basebackup，然后启动standby。
 
-### 高可用归档策略
+### 2.13.2 高可用归档策略
 
 1. 归档至独立存储
 
@@ -473,7 +486,7 @@ standby在启动后首先会进入**catchup mode**，则这个模式下standby�
 
     - 为了保证主从的archive都是完整的，在PITR恢复完主库之后，创建从库的时候使用的`pg_basebackup`命令应该不传输wal，也即：不添加`-X`参数（10.4以后，可以设置`-X none`）。否则，pg_basebackup会将basebackup过程中产生的wal（至少一个，可能更多）直接拷贝至target目录（也即从库的PGDATA/pg_xlog），在从库起来以后对于pg_xlog下已经存在的wal，它不会再进行archive，也就是说这些wal在从库的archive目录下就丢失了
 
-### 容灾发生前后归档的状态
+### 2.13.3 failover 和 PITR
 
 *以下仅适用pg-9.5+*
 
@@ -481,7 +494,35 @@ standby在启动后首先会进入**catchup mode**，则这个模式下standby�
 
 假设当前的WAL名为WAL1-1，然后发生了容灾，当B promote为主库的时候，在B上的WAL1-1还不是完整的，但是B又需要将timeline加一，并且生成新的WAL（称之为WAL2-1），那么B会将这个不完整的WAL1-1重命名为WAL1-1.partial（内容是一样的），然后对其进行archive。同时，从WAL1-1.partial拷贝出一个新的文件WAL2-1，并会作为当前的WAL继续接收新的LSN。
 
+假设，如果有两个事务C1和C2发生在WAL1-1期间，如果此时发生容灾，在promote的主库上面此时生成的WAL2-1也包含了这两个C1和C2的事务（如上所述）。假设这时候，想要恢复到“C1发生以后，C2发生以前”，那么需要指定的`recovery_target_timeline`应该是**2**，因为WAL1-1.partial虽然被archive了，但是不会被用于recovery。
+
+这就引发一个问题，当用户指定一个时间点，如何确定这个时间点对应的tiemlineID？有以下几个思路：
+
+1. 在`archive_command`中监控timeline切换的事件，如果发生了的话记录下当时的时间点。之后将需要恢复到的时间点与这些记录进行对比即可。记录到的位置一定是在PGDATA目录以外的一个地方；
+2. 直接解析*archive*中的wal，对比其中的COMMIT时间点。查询算法可以使用二叉查找法，但是比较的时候需要考虑有的wal是没有commit的，而有的wal是有多个commit。并且，假设指定的恢复时间点刚好在WAL1-2和WAL2-1之间，那么这时候其实选择timeline1或者2是没有区别的。
+
 具体的关于parital的特性可以参考[这篇](https://paquier.xyz/postgresql-2/postgres-9-5-feature-highlight-partial-segment-timeline/)文章。
+
+### 2.13.4 hot standby 和 PITR
+
+官网上关于`hot_standby`的定义如下：
+
+> hot_standby(boolean)
+> Specifies whether or not you can connect and run queries during recovery, as described in Section 25.5. The default value is off. This parameter can only be set at server start. It only has effect **during archive recovery** or **in standby mode**.
+
+所以，对于warm standby，仅在*recovery.conf*中指定`standby_mode = on`，才会将自己作为一个从库；而对于hot standby，除了前者这种情况，还有一种情况会把自己作为从库是当在*postgresql.conf*中指定`hot_standby = on`，并且处于archive recovery，即在*recovery.conf*中指定了`restore_command`。
+
+假设，高可用的配置中从库是hot standby（可能是为了容灾监控或别的什么原因），然后在从库上做了basebackup。那么，当主库使用这个basebackup做恢复的时候，由于*postgresql.conf*中的`hot_standby = on`，那么恢复之后的主库会是一个hot standby。需要在恢复之后对它再做一次promote才可以。或者，在恢复前把`hot_standby`设为`off`.
+
+### 2.13.5 根据时间点获取它当时的timeline
+
+如果需要对一个DB实例反复做PITR，或者对一个容灾过的DB做PITR，需要指定timelinID。实际上，当指定某个时间之后，用户就是想恢复到那个时间点的实际的状态。而某个时间点，PG一定是处于某一个timeline上的。所以，timeline和datetime的关系实际上应该是1-1对应的。但是，PG并没有帮我们做这个映射的记录，需要我们自己解决。
+
+一种直接的想法是，可以在`archive_command`中对目标archive文件的文件名和当时的时间戳建立一个映射关系；要恢复的时候，根据传入的时间找到对应时间戳的archive文件名，同时也就确定了它的timeline，然后就可以根据timeline和传入的时间进行恢复。
+
+还有一种比较hardcore的方法，是通过解析archive的文件，将指定的时间与每个文件中的Transaction中的COMMIT时间对比，找到**第一个包含指定时间**或者**第一个最接近的并且比指定时间早**的wal文件，取它对应的timeline作为相应的timeline. 实现可以参考[这里](https://github.com/magodo/docker_practice/blob/master/postgresql/scripts/common.sh).
+
+注意这里所说的**第一个比指定时间早的最少的**！为什么单纯找一个**最后一个比指定时间早**的wal是不成立的？这就要谈谈WAL的内容了：假设现在有WAL1-1，里面包含了两个COMMIT：C1,C2。此时，发生PITR，恢复到"C1之后，C2之前"。那么，新生成的WAL2-1中**会包含C1**，假设WAL2-1在switch前没有任何事务，那么WAL2-1就是一个仅包含C1的文件。如果，现在我们又想恢复到"C2以后"，那么如果找最后一个比指定时间早的wal，满足条件的是WAL2-1，但是实际上WAL2-1并不包含C2，因此会得出错误的结果。所以我们要找的其实是**比指定时间早的最少的**的wal。那么，为什么又要加一个**第一个**这个条件呢？按照刚才的例子，假设在恢复到"C1之后，C2之前"以后，我们再做一次同样的恢复(C1之后，C2之前)，那么这时如果不指定**第一个**这个条件，我们找到的WAL是WAL2-1.这虽然不会影响恢复结果，但是毕竟还是不精确的，作为一个严谨的程序员，我们应该指定条件为**第一个比指定时间早的最少的**!!!
 
 # 3. 服务器设置
 
