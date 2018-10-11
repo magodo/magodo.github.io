@@ -189,7 +189,7 @@ done < <(find <some path> <some condition> -print0)
 
 `read`有时候可以用于把字符串中以某个特殊字符分隔的部分读入到若干变量或者一个数组中，例如：有一个字符串"1|2|3"，如果想将1，2，3分别保存到a，b，c三个变量中，则可以用以下的方式：
 
-    $ IFS="|" read -r a b c < <(echo "1|2|3")
+    $ IFS="|" read -r a b c < <(echo -n "1|2|3")
 
 IFS的作用在**Word Splitting**章节提到：
 
