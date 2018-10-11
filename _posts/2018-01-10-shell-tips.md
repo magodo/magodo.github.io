@@ -185,6 +185,22 @@ done < <(find <some path> <some condition> -print0)
 
 * `-d ''` in `read`: 由于`find`以NULL符分隔找到的文件名，因此`read`需要以NULL来分隔这些输入行（即文件名），`-d ''`就是指定这一点的。如果没有这个选项，`read`默认是用`\n`来分隔输入的行的。
 
+# read
+
+`read`有时候可以用于把字符串中以某个特殊字符分隔的部分读入到若干变量或者一个数组中，例如：有一个字符串"1|2|3"，如果想将1，2，3分别保存到a，b，c三个变量中，则可以用以下的方式：
+
+    $ IFS="|" read -r a b c < <(echo "1|2|3")
+
+IFS的作用在**Word Splitting**章节提到：
+
+> The shell treats each character of $IFS as a delimiter, and splits the results of the other expansions into words using these characters as field terminators.
+
+值得注意的是，这里不要用herestring, 因为herestring会在最后加上一个换行符，导致`c`会保存了"3\n".
+
+如果想保存到数组，则使用`-a`选项即可：
+
+    $ IFS="|" read -r -a array < <(echo "1|2|3")
+
 # pipe
 
 对于不同的shell，有管道操作符的指令在进程管理上是不一样的：
