@@ -464,13 +464,16 @@ standby在启动后首先会进入**catchup mode**，则这个模式下standby�
 
 1. 创建一个新的高可用实例，然后做PITR恢复:
 
-    首先，创建一个primary实例，然后PITR恢复到指定的target。再以这个primary实例创建它的standby。
-
     这么做的好处在于，原有高可用实例可以维持服务。在验证恢复成功后，再将开放连接。
 
-2. PITR恢复已有的高可用实例：
+2. PITR恢复已有的高可用实例
 
-    停止DB，对当前的priamry与basebackup做同步（rsync），然后PITR恢复到指定的target。在primary恢复以后，再将standby的PGDATA清空，重新根据primary做basebackup，然后启动standby。
+恢复的步骤也有两种：
+
+1. 先恢复primary，然后将standby重做（即对新的primary做basebackup，然后配置*recovery.conf*，启动）。这种做法会需要两次basebackup拷贝的时间。
+2. 先暂停primary和standby。然后，同时恢复primary和standby。之后，在从库上配置*recovery.conf*。这时候注意，如果你直接重启standby的话由于stop的时候会做一次checkpoint，导致从库的LSN比当前主库的LSN更新，那么从库会去向主库请求更新的LSN而失败。暂时我的做法是在主库上也做一次重启。
+
+    这种好处是basebackup的拷贝只需要一次。
 
 ### 2.13.2 高可用归档策略
 
