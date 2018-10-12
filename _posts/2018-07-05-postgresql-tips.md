@@ -475,7 +475,7 @@ standby在启动后首先会进入**catchup mode**，则这个模式下standby�
 
     这种好处是basebackup的拷贝只需要一次。
 
-    值得注意的是，对于归档至实例所在的存储的情况（见2.13.2），在恢复前需要先stop主库，再stop从库。由于standby在关闭的时候不会主动switch WAL（事实上任何时刻都不会switch，standby的WAL的变化只会跟随主库），如果并行关闭primary和standby，那么此时可能导致两边archive目录的内容不一致，主库最后的switch WAL的事件并没有同步到从库，那么从库最后的那个WAL依然是当前active的WAL，并且没有被archive。如果接下来要归档的时间刚好落在这个WAL里面，从库是没法恢复到正确的位置的。
+    值得注意的是，对于归档至实例所在的存储的情况（见2.13.2），在恢复前需要先stop主库，再stop从库。由于standby在关闭的时候不会主动switch WAL（事实上任何时刻都不会switch，standby的WAL的变化只会跟随主库），如果并行关闭primary和standby，那么此时可能导致两边archive目录的内容不一致，主库最后的switch WAL的事件并没有同步到从库，那么从库最后的那个WAL依然是当前active的WAL，并且没有被archive。如果接下来要归档的时间刚好落在这个WAL里面，从库是没法恢复到正确的位置的。可能有的人会认为再次建立主从关系以后，从库会向主库请求新的
 
 ### 2.13.2 高可用归档策略
 
@@ -528,6 +528,26 @@ standby在启动后首先会进入**catchup mode**，则这个模式下standby�
 还有一种比较hardcore的方法，是通过解析archive的文件，将指定的时间与每个文件中的Transaction中的COMMIT时间对比，找到**第一个包含指定时间**或者**第一个最接近的并且比指定时间早**的wal文件，取它对应的timeline作为相应的timeline. 实现可以参考[这里](https://github.com/magodo/docker_practice/blob/master/postgresql/scripts/common.sh).
 
 注意这里所说的**第一个比指定时间早的最少的**！为什么单纯找一个**最后一个比指定时间早**的wal是不成立的？这就要谈谈WAL的内容了：假设现在有WAL1-1，里面包含了两个COMMIT：C1,C2。此时，发生PITR，恢复到"C1之后，C2之前"。那么，新生成的WAL2-1中**会包含C1**，假设WAL2-1在switch前没有任何事务，那么WAL2-1就是一个仅包含C1的文件。如果，现在我们又想恢复到"C2以后"，那么如果找最后一个比指定时间早的wal，满足条件的是WAL2-1，但是实际上WAL2-1并不包含C2，因此会得出错误的结果。所以我们要找的其实是**比指定时间早的最少的**的wal。那么，为什么又要加一个**第一个**这个条件呢？按照刚才的例子，假设在恢复到"C1之后，C2之前"以后，我们再做一次同样的恢复(C1之后，C2之前)，那么这时如果不指定**第一个**这个条件，我们找到的WAL是WAL2-1.这虽然不会影响恢复结果，但是毕竟还是不精确的，作为一个严谨的程序员，我们应该指定条件为**第一个比指定时间早的最少的**!!!
+
+### 2.13.5 standby 向 primary 请求WAL的过程
+
+见下面的时序图(来自[The Internals of PostgreSQL](http://www.interdb.jp/pg/))：
+
+![standby_handshake](/assets/img/postgresql/standby_handshake.png)
+
+1. Start primary and standby servers.
+2. The standby server starts a startup process.
+3. The standby server starts a walreceiver process.
+4. The walreceiver sends a connection request to the primary server. If the primary server is not running, the walreceiver sends these requests periodically.
+5. When the primary server receives a connection request, it starts a walsender process and a TCP connection is established between the walsender and walreceiver.
+6. The walreceiver sends the latest LSN of standby's database cluster. In general, this phase is known as handshaking in the field of information technology.
+7. If the standby's latest LSN is less than the primary's latest LSN (Standby's LSN < Primary's LSN), the walsender sends WAL data from the former LSN to the latter LSN. Such WAL data are provided by WAL segments stored in the primary's pg_xlog subdirectory (in version 10 or later, pg_wal subdirectory). Then, the standby server replays the received WAL data. In this phase, the standby catches up with the primary, so it is called catch-up.
+8. Streaming Replication begins to work.
+
+我们这里重点要说的是第六点和第七点：
+
+- 第六点告诉我们，从库是从当前最新的LSN开始向主库去索取的，这意味着如果从库之前的LSN与主库有不一致，那么创建出来的主从数据依然不一致
+- 第七点告诉我们，如果主库有比从库当前LSN更新的LSN，那么主库会将从这个LSN开始到自己最新的LSN这个范围内的所有LSN都发送给从库。注意，这是一个闭区间，即从库发送给主库的这个LSN对应的主库上的LSN，主库也会发回给从库，从而覆盖从库中原本的那条LSN。
 
 # 3. 服务器设置
 
