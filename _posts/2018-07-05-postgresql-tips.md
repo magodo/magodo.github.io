@@ -471,9 +471,11 @@ standby在启动后首先会进入**catchup mode**，则这个模式下standby�
 恢复的步骤也有两种：
 
 1. 先恢复primary，然后将standby重做（即对新的primary做basebackup，然后配置*recovery.conf*，启动）。这种做法会需要两次basebackup拷贝的时间。
-2. 先暂停primary和standby。然后，同时恢复primary和standby。之后，在从库上配置*recovery.conf*。这时候注意，如果你直接重启standby的话由于stop的时候会做一次checkpoint，导致从库的LSN比当前主库的LSN更新，那么从库会去向主库请求更新的LSN而失败。暂时我的做法是在主库上也做一次重启。
+2. 同时恢复primary和standby。之后，在从库上配置*recovery.conf*。这时候注意，如果你直接重启standby的话由于stop的时候会做一次checkpoint，导致从库的LSN比当前主库的LSN更新，那么从库会去向主库请求更新的LSN而失败。暂时我的做法是在主库上也做一次重启。
 
     这种好处是basebackup的拷贝只需要一次。
+
+    值得注意的是，对于归档至实例所在的存储的情况（见2.13.2），在恢复前需要先stop主库，再stop从库。由于standby在关闭的时候不会主动switch WAL（事实上任何时刻都不会switch，standby的WAL的变化只会跟随主库），如果并行关闭primary和standby，那么此时可能导致两边archive目录的内容不一致，主库最后的switch WAL的事件并没有同步到从库，那么从库最后的那个WAL依然是当前active的WAL，并且没有被archive。如果接下来要归档的时间刚好落在这个WAL里面，从库是没法恢复到正确的位置的。
 
 ### 2.13.2 高可用归档策略
 
