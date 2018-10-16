@@ -19,7 +19,7 @@ excerpted: |
 具体的步骤为：
 
 1. `$ objcopy --only-keep-debug <obj> <obj>.debug` ： 将`obj`的debug相关的sections拷贝到`obj.debug`
-2. `$ strip --strip-debug --strip-unneeded <obj>` ：将`obj`中的不需要的section和debug的section去除
+2. `$ strip --strip-unneeded <obj>` ：将`obj`中的重定向期间不需要的section（例如：debug段, symbol段）去除
 3. `$ objcopy --add-gnu-debuglink=<obj>.debug <obj>` ：在`<obj>`文件中加入.gnu_debuglink section，它记录了debug section存在哪个文件里（并且通过CRC保证是出自同一个build）。这里需要注意的是，`<obj>.debug`可以是带路径的（相对/绝对），但是建议使用文件名，因为这样的话gdb会去几个默认路径去寻找这个文件，包括：
 
     - `<obj>`所在目录
