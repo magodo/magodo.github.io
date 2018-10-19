@@ -35,6 +35,38 @@ excerpted: |
 
   一般就是指对`~`的展开（当然也有类似`~+`, `~-`, `~[+/-]N`等用法）。
 
+## filename expansion的注意点
+
+filename expansion有以下几种用法：
+
+|---
+|bracket expression|description|
+|-|-|
+|[XYZ]|match either X, Y or Z|
+|[X-Z]|range expression, match all character from X to Z(your current locale defines the order)|
+|[[:class:]]|match chars defined by POSIX char class|
+|[^...]|negating expression (not portable!)|
+|[!...]|same as above|
+|[]...] or [-...]|used to include the char `]` and `-` into set|
+|[=C=]|match any char that is equivalent to collation weight of C (current local)|
+|[[.SYMBOL.]]|matches the collating symbol SYMBOL|
+|===
+
+(转自[这里](http://wiki.bash-hackers.org/syntax/pattern))
+
+值得注意的是，所有上述的表达式（除了`[XYZ]`）需要和`[]`同时被展开（同一优先级），否则，如果`[]`内部的表达式先被展开（例如表达式是一个变量），那么这个展开后的表达式会被当作一个字符串，然后整个branchet表达式会被作为`[XYZ]`的形式展开。
+
+例如：
+
+    💤  test  ls
+    1  2  3
+    💤  test  a=1-3
+    💤  test  echo [1-3]
+    1 2 3
+    💤  test  echo [$a]
+    1 3
+
+
 # 引号
 
 详见：[Bash Guide](http://mywiki.wooledge.org/Quotes)
