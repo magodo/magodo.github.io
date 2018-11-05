@@ -321,3 +321,66 @@ class Constructors {
 ### no c'tor
 
 如果一个类既没有primary c'tor，又没有secondary c'tor，那么编译器会为其自动生成一个空的primary c'tor. 
+
+## properties
+
+### properties declared in interface
+
+interface在kotlin中可以声明property，称为**abstract property**，例如：
+
+{%highlight kotlin%}
+interface User {
+    val nickname: String
+}
+{%endhighlight%}
+
+这代表继承了这个interface的类必须提供一个方法可以读取`nickname`。由于interface中的proerty并没有定义它到底是由某个存储字段读取的还是由某个`getter()`函数获得的，因此，在interface定义当中并没有一个状态位对应这个property，即符合interface没有状态的条件。
+
+下面举几个类，它们实现了这个interface：
+
+{%highlight kotlin%}
+class PrivateUser(override val nickname: String): User
+
+class SubscribingUser(val email: String): User {
+    override val nickname: String
+        get() = email.substringBefore('@')
+}
+
+class FacebookUser(val accountId: int): User {
+    override val nickname = getFacebookName(accountId)
+}
+{%endhighlight%}
+
+其中，`SubscribingUser`每次通过`email`这个property计算得到`nickname`，并没有一个backing field去保存`nickname`；而`FacebookUser`在初始化的时候调用一次`getFacebookName()`，并且将返回的nickname保存起来，以后每一次调用就直接返回这个保存的值即可，被称为是有**backing field**的.
+
+interface中的property可以定义其getter和setter，只要它们没有backing field，即不会保存状态即可。因此，像`SubscribingUser`也可以定义成interface:
+
+{%highlight kotlin%}
+interface SubscribingUser {
+    val email: String
+    val nickname: String
+        get() = email.substringBefore('@')
+}
+{%endhighlight%}
+
+其中，`email`必须由子类重写，而`nickname`则可以继承。
+
+### properties declared in class
+
+在class中定义的property，class对其是有full access的。上面我们看到既可以通过初始化property并保存的方式访问(`FacebookUser`)，也可以通过定义getter的方式每次计算得到property(e.g. `SubscribingUser`)。而class带来的full access允许我们将这两种方式合并起来，即既将值保存起来，又可以在get或者set的时候提供额外的逻辑。
+
+例如：
+
+{%highlight kotlin%}
+class User(val name: String) {
+    var address: String = "unspecified"
+    set(value: String) {
+        println("""
+            Address was changed for $name:
+            "$field" -> "$value".""".trimIndent())
+        field = value
+    }
+}
+{%endhighlight%}
+
+注意，对mutable的property(`var`)只能重定义getter或者setter。上面的例子中，getter直接返回保存的**field**.

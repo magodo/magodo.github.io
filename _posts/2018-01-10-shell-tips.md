@@ -219,7 +219,7 @@ done < <(find <some path> <some condition> -print0)
 
 # read
 
-`read`有时候可以用于把字符串中以某个特殊字符分隔的部分读入到若干变量或者一个数组中，例如：有一个字符串"1|2|3"，如果想将1，2，3分别保存到a，b，c三个变量中，则可以用以下的方式：
+`read` 有时候可以用于把字符串中以某个特殊字符分隔的部分读入到若干变量或者一个数组中，例如：有一个字符串"1|2|3"，如果想将1，2，3分别保存到a，b，c三个变量中，则可以用以下的方式：
 
     $ IFS="|" read -r a b c < <(echo -n "1|2|3")
 
@@ -232,6 +232,12 @@ IFS的作用在**Word Splitting**章节提到：
 如果想保存到数组，则使用`-a`选项即可：
 
     $ IFS="|" read -r -a array < <(echo "1|2|3")
+
+另一个以换行符分隔的例子：
+
+    $ IFS=$'\n' read -r -d '' -a array < <(echo -e "a\nb\nc\n")
+    $ declare -p array
+    declare -a array=([0]="a" [1]="b" [2]="c")
 
 # pipe
 
