@@ -25,3 +25,5 @@ excerpted: |
     - `<obj>`所在目录
     - `<obj>`下的*debug*目录
     - */usr/lib/debug*
+
+另外，如果待分析的core是产生自一个被`dlopen()`（动态加载）的库（称为libfoo.so），那么在分析这个core的时候`gdb`的目标对象是这个libfoo.so。这个文件必须是和出问题的环境所处的位置一样，并且该位置下需要有libfoo.so.debug.
