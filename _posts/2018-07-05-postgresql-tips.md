@@ -425,7 +425,15 @@ standby在启动后首先会进入**catchup mode**，则这个模式下standby�
 
     所以，我们需要在每次failover的时候在新的primary上创建replication slot
 
-- 如上所述，我们会在promote以后向pg发送命令，那么我们需要一种机制确保promote已经确实完成了。然而，实际上promote做的事情只是往`PGDATA`目录中创建一个文件，告诉PG可以退出**recovery mode**。但实际上，PG还会做一些别的事情（例如：创建新的timeline）。所以，`pg_ctl promote`的结束不代表整个过程结束。在PG-v10版本以后，`pg_ctl promote`加入了`-w`选项，保证了这一点（[详见](https://paquier.xyz/postgresql-2/postgres-10-wait-pgctl-promote/)）。而在那之前，我们需要自己去判断这一点（例如可以通过发送dummy SQL给PG）
+- 如上所述，我们会在promote以后向pg发送命令，那么我们需要一种机制确保promote已经确实完成了。然而，实际上promote做的事情只是往`PGDATA`目录中创建一个文件，告诉PG可以退出**recovery mode**。但实际上，PG还会做一些别的事情（例如：创建新的timeline）。所以，`pg_ctl promote`的结束不代表整个过程结束。在PG-v10版本以后，`pg_ctl promote`加入了`-w`选项，保证了这一点（[详见](https://paquier.xyz/postgresql-2/postgres-10-wait-pgctl-promote/)）。而在那之前，我们需要自己去判断这一点（PG10以后的`pg_ctl`中是通过检查`pg_controldata`输出中的**Database cluster state**是否为**in production**来判断；另外，也可以通过`pg_is_ready`的返回，它内部是真正地尝试连接）
+
+- `pg_ctl promote`并不会在提升过程中做check point，而是在promote以后，服务运行过程中自动做check point的。这在容灾的过程（尤其是手动切换）中会引起问题，`pg_rewind`（见下一节）会先获得timeline历史的分叉点。如果在做`pg_rewind`之前，新的primary（被promote的DB）还没有做check point，那么`pg_rewind`得到的历史分叉点是个错误的点。因此，我们应该在`promote`的过程中保证check point。
+    
+    在源码 *pg_ctl.c*(REL9_6_9) 中有这么一段注释：
+
+    > For 9.3 onwards, "fast" promotion is performed. Promotion with a full checkpoint is still possible by writing a file called fallback_promote" instead of "promote"
+
+    而`pg_ctl promote`实际做的事情也非常简单，它仅仅是在*$PGDATA*下面创建了一个名为*promote*的文件，然后`kill -SIGUSR1`postmaster。因此，我们在做promote的时候可以不选择`pg_ctl promote`，而是自己创建一个*fallback_promote*文件，然后手动kill服务。
 
 ### 2.11 Failback
 
@@ -440,7 +448,8 @@ standby在启动后首先会进入**catchup mode**，则这个模式下standby�
 
 `pg_rewind`的工作原理如下：
 
-1. 它会扫描target cluster（即，待rewind的cluster）的WAL，从source cluster的timeline历史分叉的点之前的第一个checkpoint开始。对于这段区间内每一个WAL，会记录响应的data block
+1. 比对target cluster（即，待rewind的cluster）和 source cluster，找到timeline历史分叉点 。寻找的过程大致为：在target 和 source 分别通过它们的 *global/pg_control* ，以及 *pg_xlog/*.history* 获得当前的timeline history，然后进行比对，找到第一个分叉点
+1. 扫描target cluster的WAL，从source cluster的timeline历史分叉的点之前的第一个checkpoint开始。对于这段区间内每一个WAL，会记录相应的data block
 2. 将上面记录的data block从source cluster拷贝过来，可以从运行时的source cluster拷贝(`--source-server`)，也可以从停止了的source cluster拷贝（`--source-pgdata`）
 3. 将其余的文件（除了relation文件外，例如`pg_clog`/配置文件等）从source cluster拷贝过来
 4. 在target cluster的data目录下创建一个backup_label文件，指向搜索开始的checkpoint，用于当target cluster启动后应用WAL日志
