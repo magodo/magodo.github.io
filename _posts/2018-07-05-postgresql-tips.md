@@ -574,6 +574,75 @@ standby在启动后首先会进入**catchup mode**，则这个模式下standby�
 |`wal_writer_flush_after`|integer|1MB|no|写了多少WAL之后将WAL写入到磁盘，在这个时间点之间的WAL仅写入操作系统的写队列，并没有写入磁盘
 |===
 
+# 98. 零散的知识
+
+## 98.1 docker exec 执行 pg_ctl 会卡住
+
+这是因为`docker exec`执行每一条命令，在非detach的情况下不但会等待命令返回，还会等待当前执行的命令的标准输出完成。具体可以参加docker cli的源码，如下：
+
+{%highlight bash%}
+
+文件：cli/cli/command/container/exec.go:
+
+// 注意：即使没有加-i也会进入这个函数，-i只是判断是否在attach模式下attach stdin(默认只attach stderr,stdout)
+func interactiveExec(ctx context.Context, dockerCli command.Cli, execConfig *types.ExecConfig, execID string) error {
+    ...
+
+    errCh := make(chan error, 1)
+
+    go func() {
+        defer close(errCh)
+        errCh <- func() error {
+            streamer := hijackedIOStreamer{
+                streams:      dockerCli,
+                inputStream:  in,
+                outputStream: out,
+                errorStream:  stderr,
+                resp:         resp,
+                tty:          execConfig.Tty,
+                detachKeys:   execConfig.DetachKeys,
+            }
+
+            return streamer.stream(ctx)
+        }()
+    }()
+
+    ...
+
+    if err := <-errCh; err != nil {
+        logrus.Debugf("Error hijack: %s", err)
+        return err
+    }
+
+    ...
+}
+
+文件：cli/cli/command/container/hijack.go
+
+// stream handles setting up the IO and then begins streaming stdin/stdout
+// to/from the hijacked connection, blocking until it is either done reading
+// output, the user inputs the detach key sequence when in TTY mode, or when
+// the given context is cancelled.
+func (h *hijackedIOStreamer) stream(ctx context.Context) error {
+    ...
+}
+
+{%endhighlight%}
+
+由上面那段`stream()`的注释可以知道，这个函数返回的条件有以下几个：
+
+1. 待执行命令输出结束
+2. 用户在TTY模式下输入detach key sequence
+3. 函数中的context参数被取消/超时
+
+其中，我们可以排除2和3（因为context在exec.go中是context.Background）。而`pg_ctl`如果不加`-l`，则会一直往标准输出打log：
+
+> man pg_ctl:  On Unix-like systems, by default, the server's standard output and standard error are sent to pg_ctl's standard output (not standard error). The standard output of pg_ctl should then be redirected to a file or piped to another process such as a log rotating program like rotatelogs; otherwise postgres will write its output to the controlling terminal (from the background) and will not leave the shell's process group.
+
+从而导致`docker exec`一直卡住。
+
+解决的办法就是给`pg_ctl`加上`-l`参数。
+
 # 99. 中间件
 
 ## 99.1 pgPool2
