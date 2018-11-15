@@ -580,7 +580,7 @@ standby在启动后首先会进入**catchup mode**，则这个模式下standby�
 
 这是因为`docker exec`执行每一条命令，在非detach的情况下不但会等待命令返回，还会等待当前执行的命令的标准输出完成。具体可以参加docker cli的源码，如下：
 
-{%highlight bash%}
+{%highlight go%}
 
 文件：cli/cli/command/container/exec.go:
 
