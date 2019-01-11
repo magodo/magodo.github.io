@@ -101,3 +101,28 @@ excerpted: |
 - 描述：定义在 *role/defaults/main.yml* 中的变量，用于对不同的role定义用到的变量的默认值。
 
 一般的用法为：role中定义了对于每个role的默认参数 ( **role defualts** )和变量 ( **role vars** ). inventory中定义了host和group相关的变量 ( **group/host_vars** ). 它们的优先级情况为： `role defaults < group_vars < host_vars < role vars`. 如果，对于一个已经写好的role，用户想要改变其中的 **role vars**, 可以在定义 `play` 的 `roles` 的地方传入 **role params** , 其优先级大于 **role vars** ，且是用户可控的。
+
+# 99 Tips
+
+## 99.1 Jinja2 批量修改list中的每一个元素
+
+使用map+regex_replace，来对每一个元素做修改. 例如，我们要将`[a.sh, b.sh]`这个list中的每个元素都加入前缀路径，可以写成下面这样：
+
+{% raw %}
+    - name: prepend dir for each file
+      debug:
+        msg: "{{ [a.sh, b.sh] | map('regex_replace', '^(.*)$', '/path/\\1') | list }}"
+{% endraw %}
+
+那么，如果这个前缀路径是保存在变量中的，那么应该写成下面这样:
+
+{% raw %}
+    # path is a variable
+    - name: prepend dir for each file
+      debug:
+        msg: "{{ [a.sh, b.sh] | map('regex_replace', '^(.*)$', path + '/\\1') | list }}"
+{% endraw %}
+
+这是因为，在jinja的template里面`{{...}}`，可以看成是一段python的代码，支持大部分python的基本语法。
+
+

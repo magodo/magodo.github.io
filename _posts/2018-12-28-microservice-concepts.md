@@ -3,7 +3,7 @@ layout: "post"
 title: "Microservice Concepts"
 categories: "blog"
 tags: ['micorservice']
-published: true
+published: false
 comments: true
 script: [post.js]
 excerpted: |
@@ -63,4 +63,3 @@ excerpted: |
 每个微服务都应该是一个状态机。假设，这个微服务控制个DB实例的生命周期。那么，所有对该服务的请求都应该顺序的执行，并且状态间的迁移有明确的定义。这样，可以防止状态的冲突。
 
 有时候，一个操作需要多个请求才能完成，建议使用reactive extension.
-
