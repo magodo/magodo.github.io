@@ -93,7 +93,15 @@ driver中的`Open()`更像是Connect，它是实实在在地往某个DB实例创
 
 并不是所有的driver都实现`Ping()`，例如，mysql实现了，但是pg没有。
 
-注意，和`Query()`一样，它也有接收context的版本。
+在sql库中对`Ping()`的描述如下：
+
+> Ping verifies a connection to the database is still alive, establishing a connection if necessary.
+
+而实际上(截止: Feb.20.2019)，`pq`没有实现这个接口；而`mysql`的master分支已经比较正确的实现了(最新的tag:v1.4.1中依然存在bug，见[这里](https://github.com/go-sql-driver/mysql/pull/875))，即如果有一个`sql.DB`对象，循环地执行`Ping()`操作，当DB关闭之后，`Ping()`返回失败；而DB再次启动之后，`Ping()`又返回成功，并且这个对象也可以继续使用。
+
+对于`pq`而言，只能通过执行一些命令(e.g. `db.Exec(";")`)来检查DB的连通性了。
+
+**注意**: 这个Ping是指应用层的Ping，例如对于mysql而言，它是先完成了Connection Phase，然后在Command Phase进行的。因此，如果你只是想单纯的测试DB的网络连通性，应该使用`net.Dial`.
 
 # 5. 小结
 
