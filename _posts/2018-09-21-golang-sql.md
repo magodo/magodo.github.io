@@ -101,7 +101,17 @@ driver中的`Open()`更像是Connect，它是实实在在地往某个DB实例创
 
 对于`pq`而言，只能通过执行一些命令(e.g. `db.Exec(";")`)来检查DB的连通性了。
 
-**注意**: 这个Ping是指应用层的Ping，例如对于mysql而言，它是先完成了Connection Phase，然后在Command Phase进行的。因此，如果你只是想单纯的测试DB的网络连通性，应该使用`net.Dial`.
+**注意**: 这个Ping是指应用层的Ping，例如对于mysql而言，它是先完成了Connection Phase，然后在Command Phase进行的。成功意味着：
+
+- DB在传输层可以连接
+- 帐号名密码匹配
+- DB连接没有达到上限
+- ...
+
+如果你只是想判断DB服务是否启动，也即DB是否监听响应的IP和端口，而不在乎DB是否可以对外提供服务，那么你应该通过以下几种方式中的一种：
+
+- 使用`net.Dial`。注意，如果你获得的是一个dsn (e.g. 对于mysql: `root:123@tcp(localhost:3306)/foobar`)，那么通过它想获得`net.TCPAddr`需要使用响应driver中的解析函数
+- 执行一条dummy命令，仅关注错误类型为`net.OpError`。例如，mysql中执行`select 1`; pg中执行`;`。
 
 # 5. 小结
 
