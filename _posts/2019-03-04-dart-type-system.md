@@ -132,7 +132,7 @@ Dart是强类型系统的语言，除了提供编译时的类型检查以外，D
 
 考虑如下类结构：
 
-![class](/assets/img/dart_sys/class.png)
+![class](/assets/img/dart_system/class.png)
 
 那么:
 
