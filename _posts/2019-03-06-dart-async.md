@@ -217,13 +217,18 @@ Process foo
 
 这里在main函数结束前先输出`Fetching foo...`的原因是，这部分代码在`await fetchFoo()`的时候就已经被执行了，只有返回的`foo`才被用来构造`future`并发起异步。而后续的`await processFoo()`则是作为上一个`future`的回调被执行，执行的时候由于使用了`await`，所以会再一次创建一个`future`并发起异步，不过这些动作都是发生在main函数结束以后了，所以`Process foo`显示在`main ends`之后。
 
-正确的改动应该是这样：
+完全等价的改动应该是这样：
 
 ```dart
 void doFoo() async {
-    await (){return;};
-    await processFoo(await fetchFoo());
+    await null;
+    await processFoo(fetchFoo());
 }
 ```
+
+(当然，你要在`fetchFoo()`前面加个`await`也没什么关系)
+
+[detail](https://github.com/dart-lang/sdk/blob/master/docs/newsletter/20170915.md#migration)
+
 
 ## Error Handling
