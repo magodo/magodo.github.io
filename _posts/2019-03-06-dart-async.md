@@ -195,7 +195,18 @@ void Foo() async {
 我试图在这里指出的有以下几点：
 
 1. `async`的作用仅为允许被修饰的函数内部调用`await`（[detail](https://github.com/dart-lang/sdk/blob/master/docs/newsletter/20170915.md#synchronous-async-start)），而一个函数到底是同步的还是异步的，完全取决于其内部实现。因此，在不改变API的情况下可以改变一个函数的同步异步属性
-2. 上面的例子中的`await DoA()`不是说将`DoA()`整体丢到event loop中等待被执行。而是直接运行`DoA()`直到它返回。从这个角度来看，有没有`await`都一样。但是，`await`的真正作用是它会影响后面的语句。所有后面的语句会被作为callback append到`await`所触发的那个`future`(事件)
+2. 上面的例子中的`await DoA()`不是说将`DoA()`整体丢到event loop中等待被执行。而是直接运行`DoA()`直到它返回。从这个角度来看，有没有`await`都一样。但是，`await`的真正作用是它会影响后面的语句；
+
+    - 所有后面的语句会被作为callback append到`await`所触发的那个`future`(事件)。就好比它们都作为那个future的`then`的callback
+    - 假设有以下的语句:
+
+        ```dart
+        Future<String> foo()  {...}
+        final a = await foo();
+        print('${a.runtimeTpye}');
+        ```
+
+        那么，最终输出的是`String`。虽然`foo()`返回的是个`Future<String>`，但是，当`a`在`await`以后被使用的时候，它就类似`then`中的callback一样，已经被转换成最终的完成时的类型了(`String`)。
 
 因此，我们上面的例子如果改动如下(错误的实现)：
 
