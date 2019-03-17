@@ -1,0 +1,32 @@
+@startuml
+hide empty description
+skinparam defaultTextAlignment left
+
+skinparam state {
+  StartColor Black
+  EndColor Red
+  BackgroundColor LightBlue
+  BorderColor Gray
+  FontName Impact
+}
+
+[*] --> PreRaceState
+
+PreRaceState -down-> RaceState: [StateHasSession]
+RaceState: try to create ephemeral znode
+
+RaceState -down-> MasterState: [succeeds]
+RaceState -down-> WatchState: [node exists)]\n- watch eznode existance
+
+WatchState: - listen to "default watcher"\n- listen to "existence watcher"
+WatchState -up-> RaceState: [EventNodeDelete]
+WatchState -down-> WatchClosedState: [StateDisconnected]
+WatchClosedState -up-> WatchState: [StateHasSession]
+WatchClosedState -up-> PreRaceState: [StateExpired]
+
+MasterState: Handle business tasks
+MasterState -down-> MasterClosedState: [StateDisconnected]\n- (conservatively) stop business tasks\n   (since we're not aware of whether session expiration)
+MasterClosedState -up-> MasterState: [StateHasSession]\n - start business tasks
+MasterClosedState -up-> PreRaceState: [StateExpired]
+
+@enduml
