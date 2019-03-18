@@ -61,7 +61,7 @@ excerpted: |
 
 # 每种情况对会话资源影响
 
-接下来讨论下每种情况对会话环境的影响，这里的会话环境指client创建的eznode和watcher.
+接下来讨论下每种情况对会话资源的影响（这里的会话资源指client创建的eznode和watcher）
 
 - client重启
 
@@ -89,6 +89,4 @@ excerpted: |
 
 假设有多个节点负责同一个功能，其中一个节点作为主节点对外服务，而其余节点作为备用节点。当主节点宕机或者网络分区，选择一个备用节点作为新的主节点，而旧的主节点停止之前的任务，并且在恢复之后自动降级为备用节点。
 
-每个节点的状态迁移如下图所示：
-
-![state_ha](/assets/img/zk/ha_stat.png)
+我写了一个通用的框架: [zkha](https://github.com/magodo/go-zk-ha)
