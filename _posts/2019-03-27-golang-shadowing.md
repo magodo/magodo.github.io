@@ -102,3 +102,8 @@ go install golang.org/x/tools/go/analysis/passes/shadow/cmd/shadow
 ./main.go:16:6: declaration of "err" shadows declaration at line 9
 ```
 
+不过，有时候你确实想在新的作用域中创建一个与上一层的某个变量同名的变量。但是，此时`shadow -strict`依然会报错。这种报错我们可以认为是误报，你或许可以忽略。然而，设想一下你有很多源文件，你很自信这些文件里面现存的报错都是误报。但是，继续开发一段时间以后，再跑一遍`shadow`，你怎么样从这时输出的报错中筛选出那些这段时间开发引入的真正的shadowing bug呢🤔 
+
+似乎没有什么办法。。。
+
+换个思路，我们应该从一开始就消灭所有的报错，即使它是误报。我们也可以使用重命名变量的方式来解决。但是，面对已有的海量代码，重命名很麻烦，这时候[`godoctor`](http://www.gorefactor.org/doc.html#godoctor-vim) is your friend 👻
