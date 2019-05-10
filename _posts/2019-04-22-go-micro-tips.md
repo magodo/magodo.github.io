@@ -54,7 +54,7 @@ type ExampleHandler interface {
 
 除了这个默认的实现，它也允许用户使用grpc来创建client和server。使用的方法为：
 
-1. proto文件的编译：在编译proto的时候要加入：`--go_out=<some dir> --micro_out=<some dir>` （不过这两个选项和你是否使用grpc无关，只要你使用了rpc都要这么传）
+1. proto文件的编译：在编译proto的时候将`--go_out=<some_dir>`改为`--go_out=plugins=grpc:<some_dir>`
 2. server和client的创建：在创建server/client的时候使用`micro/go-grpc`提供的`NewService()`(而不是`micro/go-micro`的`NewService()`)
 3. (仅当前版本) 需要在go.mod中加入：
 
