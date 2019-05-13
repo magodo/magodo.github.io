@@ -79,7 +79,14 @@ excerpted: |
 
     CMD ["/usr/sbin/sshd", "-D"]
 
-(很奇怪，后面测试下来觉得centos版本的连接速度很慢。)
+## 登录SSH慢
+
+容器内部启动sshd，从宿主机登录可能会需要几十秒到几分钟的延迟。有如下原因和解决方案（参考自[这里](http://ask.xmodulo.com/fix-slow-ssh-login-issue-linux.html)）:
+
+- sshd 使用了 GSSAPI Auth: 设置`GSSAPIAuthentication` 为 `no`
+- sshd 使用了 DNS 反向解析（使用CentOS时慢的原因）：出于安全的原因，sshd会对输入的ip地址做反向域名解析，如果这个反向解析失败或者超时，会导致明显的登录延时。解决方法是设置`UseDNS`为`no`
+
+当然，每次设置完毕之后都要reload一下sshd (`SIGHUP`)
 
 # Build
 
