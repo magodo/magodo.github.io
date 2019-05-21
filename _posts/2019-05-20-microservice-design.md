@@ -106,7 +106,10 @@ Choreography的模式有个问题是下如果某个服务模块没有接收到�
 
 至于那种long request and complext logic after response，则应该从设计上就避免。
 
-需要注意的是，rpc server side stream在很多框架（例如: go-micro）中是不支持graceful shutdown的，为了实现发布不影响服务的需求，我们需要自己做点额外的工作。
+需要注意:
+
+1. rpc server side stream在很多框架（例如: go-micro）中是不支持graceful shutdown的，为了实现发布不影响服务的需求，我们需要自己做点额外的工作
+2. rpc event 模式需要实现同步接口（如果有同步需求的话），否则发送请求的client可能不是接收请求的client，导致无法实现同步逻辑。另外，如果服务端的响应比较统一，那么可以通过给同步接口进行封装的方式实现异步接口(结合reflect)，比较方便
 
 例如对于go-micro，我们可以设计一个全局的wait group，在每次client/server处理stream的goroutine启动前将`wg.Add(1)`，并且在该goroutine退出时执行`wg.Done()`。同时，在server启动的时候对go-micro的server注册`Before/AfterStop()`hook，在里面调用`wg.Wait()`.
 
