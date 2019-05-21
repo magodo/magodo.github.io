@@ -181,8 +181,109 @@ func (dc *dcWrapper) Call(ctx context.Context, req client.Request, rsp interface
 - 启动一个watcher来watch consul中的feature相关的kv的更新
 - 每当要发起一个请求，根据这个请求的服务接收方(`service`)和这个请求对应的`user_id`，进行对服务的基于label的filter
 
+# wrapper
+
+go-micro 中的wrapper一般是在`micro.NewService()`的时候传入的，大致有以下几种：
+
+- **ClientWrapper**: 调用`micro.WrapClient()`返回，该函数的输入参数可以是多个wrapper，这些wrapper的作用是在封装当前的client，所以，它们会返回一个新的client。需要注意的是，这个封装的顺序和传入的顺序**相反**（实际上这样更好理解，一个请求发生的时候，先调用第一个传入的wrapper内的逻辑，再调用第二个，以此类推，最后调用实际的client逻辑）:
+
+    ```go
+    func WrapClient(w ...client.Wrapper) Option {
+        return func(o *Options) {
+            // apply in reverse
+            for i := len(w); i > 0; i-- {
+                o.Client = w[i-1](o.Client)
+            }
+        }
+    }
+    ```
+
+    例如，你想对一个client加入以下两个wrapper：
+    
+    - tracing wrapper: 封装了client的`Call()`等函数，这些函数会在调用前创建一个span，并且将span作为context传入rpc的调用
+    - log wrapper: 封装了client的`Call()`等函数，这些函数会在调用前从ctx中获取span，并且使用span记录log
+
+    显然，这里的*log wrapper*依赖于*tracing wrapper*，也就是说，实际client的`Call()`应按先完成`tracing wrapper`的工作，然后再完成`log wrapper`的工作。所以传入的顺序如下:
+
+    ```go
+    service := micro.NewService(
+        micro.WrapClient(
+            opentracingWrapper.NewClientWrapper(tracer),
+            logWrap,
+        ),
+    )
+    ```
+
+- **CallWrapper**: ClientWrapper的简化版，仅影响`Client.Call()`
+
+- **HandlerWrapper**: 调用`micro.WrapHandler()`返回，该函数的输入参数可以是多个wrapper，这些wrapper的作用是*返回一个返回封装当前server的handler函数的函数*，并且将这些函数记录在server的options中。在之后实际接收到某个请求的时候，会按照options中记录的wrapper的逆序进行应用:
+
+    ```go
+    // FROM: go-micro/options.go
+    // WrapHandler adds a handler Wrapper to a list of options passed into the server
+    func WrapHandler(w ...server.HandlerWrapper) Option {
+        return func(o *Options) {
+            var wrappers []server.Option
+
+            for _, wrap := range w {
+                wrappers = append(wrappers, server.WrapHandler(wrap))
+            }
+
+            // Init once
+            o.Server.Init(wrappers...)
+        }
+    }
+
+    // FROM: go-micro/server/rpc_server.go
+    func (s *rpcServer) ServeConn(sock transport.Socket) {
+        ...
+
+        // create a wrapped function
+        handler := func(ctx context.Context, req Request, rsp interface{}) error {
+            return r.ServeRequest(ctx, req, rsp.(Response))
+        }
+
+        for i := len(s.opts.HdlrWrappers); i > 0; i-- {
+            handler = s.opts.HdlrWrappers[i-1](handler)
+        }
+
+        ...
+    }
+    ```
+
+    所以，和`ClientWrapper`一样，传入的顺序即反映了请求被执行的顺序。
+
+
+- **SubscriberWrapper**：broker subscription 的wrapper，如上。
+
+
 # option
 
 go-micro 中的几乎每一个组件的包（例如：`client`, `server`, `broker`, `registry`...）都会提供一个*options.go*的文件，其中包含了这个包在初始的时候所支持的选项。
 
 例如，默认的`server`在收到关闭的信号(SIGTERM, SIGKILL, SIGINT)的时候只会停止监听，但是不会等待当前正在进行的那些请求结束。如果，你希望你的服务支持graceful shutdown的话，就要在创建`micro.NewService()`的时候带上`server`包提供的`Wait(bool)`选项。
+
+# broker
+
+对于server，起一个subscriber的流程如下：
+
+1. `micro.NewService()`
+2. `service.Init()`
+3. `service.RegisterSubscriber(topic, service.Server(), func/obj)`: 注册subscriber，但是**还没**有连接到*broker
+4. `service.Run()`：在`server.Start()`中会去连接broker，至此才算真正的注册了subscriber
+
+(当然，你可以直接用broker，那就需要手动的connect)
+
+对于client，发送一个topic的流程如下：
+
+1. `micro.NewService()`
+2. `service.Init()`
+3. `micro.NewPublisher(topic, service.Client())`
+4. `publisher.Publish(ctx, event)`
+
+(当然，你可以直接用broker，那就需要手动的connect)
+
+有几个点需要注意：
+
+1. 所有的message默认只支持protobuf的二进制格式
+2. publisher发送之后如果进程立刻退出，会导致发送实际没有成功。这应该是和broker的库的实现有关（例如：nats的publish是通过`bufio`，然后隔一段时间做flush）
