@@ -33,6 +33,8 @@ Choreography的模式有个问题是下如果某个服务模块没有接收到�
 
 服务之间的异步逻辑有多种实现方式：
 
+- server端提供异步接口+polling接口
+
 - 服务双方约定好协议，A提供一个service endpoint，同时要求B提供一个callback endpoint:
 
     ![async-rpc2rpc](/assets/img/microservice/async-rpc2rpc.png)
@@ -47,7 +49,7 @@ Choreography的模式有个问题是下如果某个服务模块没有接收到�
 
     缺点：
 
-    - rpc的响应message定义不太直观，例如基于protobuf的rpc可能需要用`oneof`来定义不同的response类型。并且client看到server的rpc定义不能一目了然的知道返回response的顺序，需要额外的文档
+    - rpc的响应message定义反直觉，例如基于protobuf的rpc可能需要用`oneof`来定义不同的response类型。并且client看到server的rpc定义不能一目了然的知道返回response的顺序，需要额外的文档
     - server没有graceful shutdown，server在返回stream之后，通过stream发送respond之前是可以合法关闭的。
 
 - 使用broker实现不同类型的异步逻辑，这种方式非常灵活，可以实现上面提到的逻辑甚至更多。下面举两个例子：
@@ -93,24 +95,4 @@ Choreography的模式有个问题是下如果某个服务模块没有接收到�
 
 好吧，其实微服务里没有一个普适的方案，需要各种方案的结合使用，并且结合你的业务需求。
 
-我只能说说我自己的场景，我的业务需求要求我拥有以下几个属性：
-
-- graceful shutdown
-- 有些请求需要保留上下文
-- 一个请求对应多个响应
-- 慢任务请求处理时间很久，c-s可以不保持连接
-
-最终我选择了rpc-rpcstream 和 rpc-event 这两种交互来满足我的不同需求：
-
-![async-best-practice](/assets/img/microservice/async-best-practice.png)
-
-至于那种long request and complext logic after response，则应该从设计上就避免。
-
-需要注意:
-
-1. rpc server side stream在很多框架（例如: go-micro）中是不支持graceful shutdown的，为了实现发布不影响服务的需求，我们需要自己做点额外的工作
-2. rpc event 模式需要实现同步接口（如果有同步需求的话），否则发送请求的client可能不是接收请求的client，导致无法实现同步逻辑。另外，如果服务端的响应比较统一，那么可以通过给同步接口进行封装的方式实现异步接口(结合reflect)，比较方便
-
-例如对于go-micro，我们可以设计一个全局的wait group，在每次client/server处理stream的goroutine启动前将`wg.Add(1)`，并且在该goroutine退出时执行`wg.Done()`。同时，在server启动的时候对go-micro的server注册`Before/AfterStop()`hook，在里面调用`wg.Wait()`.
-
-我之所以选择 rpc-rpcstream，而没有选择rpc pubsub (保留上下文)的原因是，后者在go-micro中无法/难以实现（go-micro暴露的broker接口很有限）.
+我个人认为接口设计越简单越好，所以觉得还是第一种更合适(异步+polling)，最多在server端再向外发送一些额外的event供一些choreography的服务使用。
