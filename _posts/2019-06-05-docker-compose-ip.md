@@ -129,3 +129,11 @@ excerpted: |
 		ports:
 		  - "1.2.3.4:8080:8080"
 
+3. 将 `com.docker.network.bridge.host_binding_ipv4` 在docker-compose中的networks的`driver_opts`中指定，例如：
+
+    ```
+    networks:
+      foo_network:
+        driver_opts:
+          com.docker.network.bridge.host_binding_ipv4: "1.2.3.4"
+    ```
