@@ -115,9 +115,17 @@ excerpted: |
 
 那么，对于`docker-compose`启动的容器怎么能够监听`dockerd`中指定的ip呢？这其实是docker-compose的已知[issue](https://github.com/docker/compose/issues/2999)，按里面的讨论来看，有两个方法：
 
-1. 在`ports`里面的`[host-port]`部分指定ip。例如：
+1. 将service的`network_mode`设置为`bridge`或者`default`（等效）。这种做法相当于让docker-compose在启动新的project的时候不要默认自动创建一个网络，而是沿用系统默认的`bridge`那个网络。
+
+    这种做法的弊端在于:
+
+    1. project之间环境无法隔离
+    2. 原本docker-compose创建的网络中所有容器之间可以通过hostname进行访问，但是如果指定用`bridge`网络，那么就没有这个能力了：
+
+        > By default Compose sets up a single network for your app. Each container for a service joins the default network and is both reachable by other containers on that network, and discoverable by them at a hostname identical to the container name.
+
+2. 在`ports`里面的`[host-port]`部分指定ip。例如：
 
 		ports:
 		  - "1.2.3.4:8080:8080"
 
-2. 将service的`network_mode`设置为`bridge`或者`default`（等效）。这种做法相当于让docker-compose在启动新的project的时候不要默认自动创建一个网络，而是沿用系统默认的`bridge`那个网络。这种做法的弊端在于project之间环境无法隔离。
