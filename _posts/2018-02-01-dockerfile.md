@@ -159,3 +159,10 @@ ARG vs ENV
 
 `ARG` 一般用于`RUN`命令，也是用于定制化编译时的行为。它更多时候是为了允许用户在编译命令参数中传递不同的值而存在：`docker build --build-arg <key>=<value>`。`ARG` 仅在当前编译stage (`FROM`) 有效。
 
+### SIGNAL
+
+`docker stop`默认向容器的PID 1进程发送`SIGTERM`。如果没有使用exec form启动命令，那么你的进程是sh的子进程，也就是说sh是PID1进程，它负责接收信号；否则，dockerfile里指定的进程是信号的接收者。
+
+这里有一个奇怪的现象是，不论那种情况，如果PID 1进程没有显示地注册信号处理函数，那么并不是使用默认的处理函数（例如`SIGTERM`默认是终止进程），而似乎是忽略该信号。因此，如果你使用exec form执行一个脚本，需要在脚本中是用`trap`明确地注册信号处理函数，否则docker stop的时候会超时触发强制停止，耗时比较长。
+
+另一种做法是，使用[`tini`](https://github.com/krallin/tini)作为PID1进程，这个程序在 Docker 1.13 以后已经内置在docker中了，使用`docker run --init`即可。它会将你指定的entrypoint作为`tini`的子进程，`tini`的生命周期取决于该子进程，并且退出码也是使用该子进程的退出码。同时，`tini`负责将收到的信号forward给这个子进程。这样，entrypoint中指定的程序就不需要显示地指定信号处理函数（除非默认行为不满足需求）。
