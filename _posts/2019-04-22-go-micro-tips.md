@@ -287,3 +287,43 @@ go-micro 中的几乎每一个组件的包（例如：`client`, `server`, `broke
 
 1. 所有的message默认只支持protobuf的二进制格式
 2. publisher发送之后如果进程立刻退出，会导致发送实际没有成功。这应该是和broker的库的实现有关（例如：nats的publish是通过`bufio`，然后隔一段时间做flush）
+
+# client 默认超时时间：5秒
+
+如果在调用pb生成的client接口时传入了不带超时的`context`（例如：`context.TODO()`）。那么，`go-micro`会为你自动加上一个全局超时时间，默认为5s:
+
+```go
+// go-micro/client/rpc_client.go
+
+    func (r *rpcClient) Call(ctx context.Context, request Request, response interface{}, opts ...CallOption) error {
+        // make a copy of call opts
+        callOpts := r.opts.CallOptions
+        for _, opt := range opts {
+            opt(&callOpts)
+        }
+
+        next, err := r.next(request, callOpts)
+        if err != nil {
+            return err
+        }
+
+        // check if we already have a deadline
+        d, ok := ctx.Deadline()
+        if !ok {
+            // no deadline so we create a new one
+            ctx, _ = context.WithTimeout(ctx, callOpts.RequestTimeout)
+        } else {
+            // got a deadline so no need to setup context
+            // but we need to set the timeout we pass along
+            opt := WithRequestTimeout(d.Sub(time.Now()))
+            opt(&callOpts)
+        }
+        ...
+    }
+
+// go-micro/client/client.go
+
+    // DefaultRequestTimeout is the default request timeout
+    DefaultRequestTimeout = time.Second * 5
+
+```
