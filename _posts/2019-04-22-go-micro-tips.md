@@ -327,3 +327,7 @@ go-micro 中的几乎每一个组件的包（例如：`client`, `server`, `broke
     DefaultRequestTimeout = time.Second * 5
 
 ```
+
+# subscription handler 的 context
+
+broker中subscription handler 的context不会带上超时时间（这是符合直觉的，因为publisher无法判断subscriptor接收到event之后会做什么，所以超时时间应该由subscriptor自己定义）。但是，其他某些元数据（例如：opentracing中的span信息）依然会带上。
