@@ -50,6 +50,8 @@ links:
 projects:
     - name: go-zk-ha
       url: https://github.com/magodo/go-zk-ha
+    - name: berrycast
+      url: https://github.com/magodo/berrycast
 
 # exclude my node and gem related stuff
 exclude: ['package.json', 'src', 'node_modules', '.bundle', 'Gemfile', 'Gemfile.lock']
