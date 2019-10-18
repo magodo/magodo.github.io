@@ -47,3 +47,13 @@ excerpted: |
 另外， `argument` 除了Provider定义的以外，不同的 `block type` 还会有一些 [`meta argument`](https://www.terraform.io/docs/configuration/resources.html#meta-arguments).
 
 建议，为了区分这两个 `block body` 中仅有的两类元素，遵循官方以及源码中的命名，称呼它们为：`attribute`/`argument` 和 `block`.
+
+# 99 TIP
+
+## 99.1 block body nested map
+
+在 [官网](https://www.terraform.io/docs/extend/writing-custom-providers.html#implementing-a-more-complex-read)有提到：
+
+> Due to the limitation of [tf-11115](https://github.com/hashicorp/terraform/issues/11115) it is not possible to nest maps. So the workaround is to let only the innermost data structure be of the type `TypeMap`
+
+这里的workaround在tf 0.12版本以后就被修复了，具体可以看上面那个issue。同时，有另外一个与之关联的[issue](https://github.com/hashicorp/terraform-website/issues/908)要求把上面这个章节删除。So...如果你打不开上面那个官网的章节的话就代表已经被删除了，如果你依然可以访问，请无视 （我在这里看了好一会儿 😶）
