@@ -64,6 +64,8 @@ Resource 基本只要：
 
 在AZureRM的SDK中，Client大多会将create和update实现在一个叫做`CreateOrUpdate()`的函数中。因此，`onCreate()`和`onUpdate()`赋值为同一个callback。
 
+**注意**: `Resource.Update` callback是可选参数，如果没有被实现，那么说明该资源不支持update
+
 这个callback接收两个参数：
 
 - `d schema.ResourceData`: 代表tf接管的state的对象(包括定义在configuration中的部分)，在这个callback中需要读取configuration中的内容，然后组合成SDK的输入参数调用client
@@ -198,9 +200,30 @@ Azure的资源的长ID总是有偶数个字段，因为每个component都是以 
 
 data resource 本质上就是一个只有`Read()`的managed resource，实现的唯一区别在于 data resource 的 `Read()` 需要设置`ResourceData`的ID，而这个ID实际就是提供这些data的后端resource的长ID。
 
-## 98.3 Test
+## 98.3 Azure Virtual Resource
 
-## 98.4 Document
+在Azure中有一些resource，它们的后端并不是该resource特定的service，甚至有一些resource没有后端service提供其CRUD。我将这些service称为 Virtual Resource.
+
+### 98.3.1 Association Resource
+
+例如：`azurerm_network_interface_application_gateway_association` 是一个 **Association Resource**, 它将 `azurerm_network_interface` 和 `azurerm_application_gateway`关联起来（通过各自的ID）。这种情况一般属于两个已经存在的资源，在后续的迭代中发现某些use case下需要两者关联使用。
+
+这时候，有两种关联的做法：
+
+1. 将其中一个resource的ID加入到另一个resource的schema。这样有个弊端：将两个资源一定程度耦合
+2. 定义一个association resource，将两个资源关联
+
+Azure中几乎全部的 association resource 都没有实现 `Resource.Update` callback。这表明这些resource一旦修改，就需要删除并重建。由于它们本来就是定义association这种关联关系的，所以这是可以接受的。
+
+### 98.3.2 Attaching Resource
+
+例如：`azurerm_servicebus_event_authorization_rule` 是一个 **Attaching Resource**，这个resource实际上作为另一个有后端service，`azurerm_servicebus_event`，对应的resource的一部分存在。在这个后端service的API spec中，attaching resource实际上对应的是API的某个sub-path。因此，在其tf resource的实现中，它使用的 azure go sdk的client就是那个实际的service（即，`azurerm_servicebus_event`）。
+
+可见，这种resource在tf中实现的前提是后端service的API对其有直接的支持。
+
+## 98.4 Test
+
+## 98.5 Document
 
 # 99 TIP
 
