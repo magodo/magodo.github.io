@@ -237,4 +237,4 @@ Azure中几乎全部的 association resource 都没有实现 `Resource.Update` c
 
 ## 99.2 tf provider 没有输出
 
-在provider中不晓得为啥输出到标准输出和错误都没用（即使export `TF_LOG`），打log的方法只能通过写文件
+Provider中的日志输出需要将 `TF_LOG` level 设置为 >= `DEBUG`
