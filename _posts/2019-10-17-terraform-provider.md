@@ -247,9 +247,7 @@ Because there is no local state, if user changes this property in outside of ter
 
 If combined with `Optional: true`, then it means "if no value is given in configuration then a value will be assigned during `Create`. But if a value is specified, then use that value. But still no record in local state file". Here, the purpose to add `Computed: true` instead of barely `Optional: true` is for cases like following:
 
-*A NSG has in-line NSR settings, while NSR can also seperately created. So if NSG' NSR property is without `Computed: true`, then if user created an empty NSG, and created a NSR1 into NSG seperately. Then when another apply happened to NSG, it will thought user specify a null NSR rule sets, while remote has 1 NSR, so tf will resolve to delete that NSR.
-
-Hence, with `Computed: true` set, if user has not explicitly specify NSG's NSR property, tf will just take the remote state as current state.*
+*A NSG has in-line NSR settings, while NSR can also seperately created. So if NSG' NSR property is without `Computed: true`, then if user created an empty NSG, and created a NSR1 into NSG seperately. Then when another apply happened to NSG, it will thought user specify a null NSR rule sets, while remote has 1 NSR, so tf will resolve to delete that NSR. Hence, with `Computed: true` set, if user has not explicitly specify NSG's NSR property, tf will just take the remote state as current state.*
 
 **Note**: the property here is essentially a nested block. I don't find a use case where `Computed:true` is helpful for attribute.
 
