@@ -238,3 +238,21 @@ Azure中几乎全部的 association resource 都没有实现 `Resource.Update` c
 ## 99.2 tf provider 没有输出
 
 Provider中的日志输出需要将 `TF_LOG` level 设置为 >= `DEBUG`
+
+## 99.3 The `Computed` Attribute
+
+`Computed: true` means "a value will be assigned during `Create`, so there is no record in local state file (see [here](https://github.com/hashicorp/terraform/blob/master/helper/schema/resource_data.go#L328))". 
+
+Because there is no local state, if user changes this property in outside of terraform, a refresh in terraform will not detect that change.
+
+If combined with `Optional: true`, then it means "if no value is given in configuration then a value will be assigned during `Create`. But if a value is specified, then use that value. But still no record in local state file". Here, the purpose to add `Computed: true` instead of barely `Optional: true` is for cases like following:
+
+*A NSG has in-line NSR settings, while NSR can also seperately created. So if NSG' NSR property is without `Computed: true`, then if user created an empty NSG, and created a NSR1 into NSG seperately. Then when another apply happened to NSG, it will thought user specify a null NSR rule sets, while remote has 1 NSR, so tf will resolve to delete that NSR.
+
+Hence, with `Computed: true` set, if user has not explicitly specify NSG's NSR property, tf will just take the remote state as current state.*
+
+**Note**: the property here is essentially a nested block. I don't find a use case where `Computed:true` is helpful for attribute.
+
+However, there exists an issue with above case, that is once a `Computed: true` & `Optional: true` block is specified explicitly (e.g. the in-line NSR in NSG). User is only able to update it by explicitly changing the property, but can't delete it. 
+
+From terraform 0.12, there comes a new schema config mode named: `schema.SchemaConfigModeAttr`, which if set will allow user to distinguish between a non-existent block and a force-zeroed block. Read official [document](https://www.terraform.io/docs/extend/terraform-0.12-compatibility.html#computed-resource-attributes) for more info.
