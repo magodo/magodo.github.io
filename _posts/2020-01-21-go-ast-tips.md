@@ -55,6 +55,10 @@ Go comes with a big bunch of packages to help user to parse and process Go code.
 
     For example, pre-submit checks that use this package directly would behave differently depending on what Go version each developer uses, causing the check to be inherently fragile.
 
+- [go/printer](https://golang.org/pkg/go/printer/)
+
+    Package printer implements printing of AST nodes.
+
 - [go/types](https://golang.org/pkg/go/types)
 
     Package types declares the data types and implements the algorithms for type-checking of Go packages. Use `Config.Check` to invoke the type checker for a package. Alternatively, create a new type checker with `NewChecker` and invoke it incrementally by calling `Checker.Files`.
@@ -127,3 +131,10 @@ type example struct {
 ```
 
 The problem is that lossy comments are **part** of the `*ast.File` and hold separated from the tree. And those are only printed when you print the **whole** file. So the workaround this is to print the whole file and then cut out the specific lines we want to return.
+
+## 99.2 Replace ast Node
+
+By leveraging the `astutil.Apply()`, we can replace or manipulate node in a AST. However, something to notice that:
+
+1. If you replace a node, then `astutil.Apply()` will not traverse both the new node and old node. So if you want to recursively apply the containing node of the new node, you need to explicitly call `astutil.Apply()` on the new node.
+2. If you replace a node via `astutil.Apply()` during `ast.Walk()`, then `ast.Walk()` will not traverse both the new noed and the old node. If you still want to walk the new node, you need to explicitly call `ast.Walk()` on the new node. (same for `ast.Inspect()`)
