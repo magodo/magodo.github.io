@@ -138,3 +138,39 @@ By leveraging the `astutil.Apply()`, we can replace or manipulate node in a AST.
 
 1. If you replace a node, then `astutil.Apply()` will not traverse both the new node and old node. So if you want to recursively apply the containing node of the new node, you need to explicitly call `astutil.Apply()` on the new node.
 2. If you replace a node via `astutil.Apply()` during `ast.Walk()`, then `ast.Walk()` will not traverse both the new noed and the old node. If you still want to walk the new node, you need to explicitly call `ast.Walk()` on the new node. (same for `ast.Inspect()`)
+
+## 99.3 Fill ast node parent
+
+Refered to [gogrep](https://github.com/mvdan/gogrep/blob/master/match.go#L32).
+
+```go
+type nodeList interface {
+	at(i int) ast.Node
+	len() int
+	slice(from, to int) nodeList
+	ast.Node
+}
+
+func (m *matcher) fillParents(nodes ...ast.Node) {
+	stack := make([]ast.Node, 1, 32)
+	for _, node := range nodes {
+		inspect(node, func(node ast.Node) bool {
+			if node == nil {
+				stack = stack[:len(stack)-1]
+				return true
+			}
+			if _, ok := node.(nodeList); !ok {
+				m.parents[node] = stack[len(stack)-1]
+			}
+			stack = append(stack, node)
+			return true
+		})
+	}
+}
+
+func (m *matcher) matches(cmds []exprCmd, nodes []ast.Node) []ast.Node {
+	m.parents = make(map[ast.Node]ast.Node)
+    m.fillParents(nodes...)
+    //...
+}
+```
