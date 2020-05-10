@@ -94,6 +94,8 @@ There are following changes:
 1. Change type of `Foo.bar`: `Bar` -> `Option<Bar>` and change the impl of `Foo.foo`, where we use `take` method of `Option<T>` which take the value out of the `Option` and leaving a `None` in its place (this actually takes ownership of the value out).
 1. As `bar` is a field in `Foo`, we need also change `Foo.foo()`'s signature from `foo(&self)` to `foo(&mut self)`.
 
+But one thing to point out is that as we are using `take()`, which will take the value out of `Option` and leave it with `None`, after we calling `foo.foo()`, then `foo.bar` is a `None`, if we call `foo.foo()` again, it will not match the `if let` pattern again.
+
 
 ## Other Solutions
 
