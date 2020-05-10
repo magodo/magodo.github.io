@@ -1,6 +1,6 @@
 ---
 layout: "post"
-title: "Rust `Option` take"
+title: "Rust - `Option` take"
 categories: "blog"
 tags: ['rust']
 published: True
