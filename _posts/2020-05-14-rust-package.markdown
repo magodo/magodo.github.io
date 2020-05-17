@@ -13,7 +13,7 @@ excerpted: |
 * TOC
 {:toc}
 
-![trait-associated](/assets/img/rust-package/trait-package.svg)
+![trait-associated](/assets/img/rust-package/package.svg)
 
 The terms:
 
