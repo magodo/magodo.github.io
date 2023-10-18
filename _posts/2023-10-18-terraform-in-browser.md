@@ -284,6 +284,8 @@ Instead of using the `os.Pipe()` to create the two pairs of pipes for stdout and
 
 This is pretty much what we've done for supporting wasm for the `go-plugin`. Some of the heavy works are done in the `go-wasmww` module, while the changes for the `go-plugin` are kept clean and managable. Those code  that need WASM adoption are moved out to a file appended with `_other.go`, with no change. Meanwhile, there are new files with the same prefix, but ends with `_wasm.go`, that contains the wasm implementation. These files are conditionally built by using Go build constraint.
 
+As the output, I've submit a PR back to the `go-plugin` project: https://github.com/hashicorp/go-plugin/pull/280.
+
 A little more words about the stdout/stderr streaming flows.
 
 For CLI version, it is illustrated below:
