@@ -3,7 +3,7 @@ layout: post
 title: "谢谢你，2024"
 categories: blog
 tags: ["life"]
-published: true
+published: false
 comments: true
 excerpted: |
   回顾我们的2024年
