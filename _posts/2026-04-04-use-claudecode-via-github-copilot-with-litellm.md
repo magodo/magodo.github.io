@@ -102,7 +102,21 @@ export ANTHROPIC_AUTH_TOKEN="foo"
 export ANTHROPIC_DEFAULT_SONNET_MODEL=sonnet
 export ANTHROPIC_DEFAULT_HAIKU_MODEL=haiku
 export ANTHROPIC_DEFAULT_OPUS_MODEL=opus
-
-# Run it
-claude
 ```
+
+To persist them, one can add them into the `~/.claude/settings.json`:
+
+```json
+{
+  //...
+  "env": {
+    "ANTHROPIC_BASE_URL": "http://0.0.0.0:4000",
+    "ANTHROPIC_AUTH_TOKEN": "foo",
+    "ANTHROPIC_DEFAULT_SONNET_MODEL": "sonnet",
+    "ANTHROPIC_DEFAULT_HAIKU_MODEL": "haiku",
+    "ANTHROPIC_DEFAULT_OPUS_MODEL": "opus"
+  }
+}
+```
+
+Next, you can simply run `claude` without any additional options.
